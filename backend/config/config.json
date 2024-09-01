@@ -1,0 +1,5 @@
+{
+    "server_port": "8080",
+    "log_level": "info",
+    "db_path": "nas_desktop.db"
+}
