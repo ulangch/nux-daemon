@@ -9,12 +9,16 @@ func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
 	// Define routes
-	r.POST("/file/create", handlers.CreateFileHandler)
-    r.POST("/file/mkdir", handlers.CreateDirectoryHandler)
-    r.GET("/file/info", handlers.GetFileInfoHandler)
-	r.GET("/file/read", handlers.ReadFileHandler)
-	r.DELETE("/file/delete", handlers.DeleteFileHandler)
+	r.GET("/device/info", handlers.GetDeviceInfoHandler)
+	r.POST("/device/update_name", handlers.UpdateDeviceNameHandler)
+	r.POST("/device/add_disk", handlers.AddDiskPath)
+	r.POST("/device/remove_disk", handlers.RemoveDiskPath)
 	r.GET("/file/list", handlers.ListFilesHandler)
+	r.GET("/file/info", handlers.GetFileInfoHandler)
+	r.GET("/file/stream", handlers.ReadFileHandler)
+	r.POST("/file/create", handlers.CreateFileHandler)
+	r.POST("/file/mkdir", handlers.CreateDirectoryHandler)
+	r.POST("/file/delete", handlers.DeleteFileHandler)
 
 	return r
 }

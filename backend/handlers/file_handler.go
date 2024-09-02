@@ -10,36 +10,20 @@ import (
 	"github.com/ulangch/nas_desktop_app/backend/models"
 )
 
-// CreateFileHandler handles the creation of a new file
-func CreateFileHandler(c *gin.Context) {
-	path := c.Query("path")
-	decodePath, err := url.QueryUnescape(path)
+// ListFilesHandler handles listing all files in a directory
+func ListFilesHandler(c *gin.Context) {
+	dir := c.Query("path")
+	decodedDir, err := url.QueryUnescape(dir)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	file, err := models.CreateFile(decodePath)
+	files, err := models.ListFiles(decodedDir)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": file})
-}
-
-func CreateDirectoryHandler(c *gin.Context) {
-	path := c.Query("path")
-	decodePath, err := url.QueryUnescape(path)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
-		return
-	}
-	file, err := models.CreateDirectory(decodePath)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": file})
+	c.JSON(http.StatusOK, gin.H{"status_code": 0, "status_message": "", "files": files})
 }
 
 func GetFileInfoHandler(c *gin.Context) {
@@ -87,6 +71,37 @@ func ReadFileHandler(c *gin.Context) {
 	http.ServeFile(c.Writer, c.Request, path)
 }
 
+// CreateFileHandler handles the creation of a new file
+func CreateFileHandler(c *gin.Context) {
+	path := c.Query("path")
+	decodePath, err := url.QueryUnescape(path)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	file, err := models.CreateFile(decodePath)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": file})
+	}
+}
+
+func CreateDirectoryHandler(c *gin.Context) {
+	path := c.Query("path")
+	decodePath, err := url.QueryUnescape(path)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	file, err := models.CreateDirectory(decodePath)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": file})
+	}
+}
+
 // DeleteFileHandler handles deleting a file
 func DeleteFileHandler(c *gin.Context) {
 	path := c.Query("path")
@@ -98,23 +113,7 @@ func DeleteFileHandler(c *gin.Context) {
 	err = models.DeleteFile(decodePath)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
-		return
+	} else {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
 	}
-	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
-}
-
-// ListFilesHandler handles listing all files in a directory
-func ListFilesHandler(c *gin.Context) {
-	dir := c.Query("path")
-	decodedDir, err := url.QueryUnescape(dir)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
-		return
-	}
-	files, err := models.ListFiles(decodedDir)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status_code": 0, "status_message": "", "files": files})
 }
