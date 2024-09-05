@@ -1,11 +1,14 @@
 package models
 
 import (
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 )
 
 type File struct {
+	Nid         string `json:"nid"`
 	Name        string `json:"name"`
 	Path        string `json:"path"`
 	Size        int64  `json:"size"`
@@ -22,12 +25,14 @@ func ListFiles(dir string) ([]File, error) {
 	if err != nil {
 		return nil, err
 	}
+	deviceID := GetDeviceID()
 	for _, entry := range entries {
 		info, err := entry.Info()
 		if err != nil {
 			return nil, err
 		}
 		files = append(files, File{
+			Nid:        deviceID,
 			Name:       info.Name(),
 			Path:       filepath.Join(dir, info.Name()),
 			Size:       info.Size(),
@@ -46,6 +51,7 @@ func GetFileInfo(path string) (File, error) {
 		return File{}, err
 	}
 	return File{
+		Nid:        GetDeviceID(),
 		Name:       info.Name(),
 		Path:       path,
 		Size:       info.Size(),
@@ -59,6 +65,7 @@ func CreateFile(path string) (File, error) {
 	info, err := os.Stat(path)
 	if err == nil && !info.IsDir() {
 		return File{
+			Nid:        GetDeviceID(),
 			Name:       info.Name(),
 			Path:       path,
 			Size:       info.Size(),
@@ -80,6 +87,7 @@ func CreateFile(path string) (File, error) {
 		return File{}, err
 	}
 	return File{
+		Nid:        GetDeviceID(),
 		Name:       info.Name(),
 		Path:       path,
 		Size:       info.Size(),
@@ -92,6 +100,7 @@ func CreateDirectory(path string) (File, error) {
 	info, err := os.Stat(path)
 	if err == nil && info.IsDir() {
 		return File{
+			Nid:        GetDeviceID(),
 			Name:       info.Name(),
 			Path:       path,
 			Size:       info.Size(),
@@ -108,6 +117,7 @@ func CreateDirectory(path string) (File, error) {
 		return File{}, err
 	}
 	return File{
+		Nid:        GetDeviceID(),
 		Name:       info.Name(),
 		Path:       path,
 		Size:       info.Size(),
@@ -126,4 +136,27 @@ func DeleteFile(path string) error {
 		return err
 	}
 	return os.RemoveAll(path)
+}
+
+func MoveFile(oldPath string, newPath string) error {
+	return os.Rename(oldPath, newPath)
+}
+
+func WriteFileChunk(path string, offset int64, data []byte) error {
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	log.Printf("WriteFileChunk start, path=%s, offset=%d, data=%d", path, offset, len(data))
+
+	// Move the file pointer to the specified offset
+	_, err = file.Seek(offset, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	// Write the data to the file
+	_, err = file.Write(data)
+	return err
 }

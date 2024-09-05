@@ -19,6 +19,7 @@ func SetupRouter() *gin.Engine {
 	r.POST("/file/create", handlers.CreateFileHandler)
 	r.POST("/file/mkdir", handlers.CreateDirectoryHandler)
 	r.POST("/file/delete", handlers.DeleteFileHandler)
-
+	r.POST("/file/move", handlers.MoveFileHandler)
+	r.POST("/file/upload", handlers.UploadFileHandler)
 	return r
 }

@@ -31,6 +31,11 @@ func InitializeDeviceID() {
 	}
 }
 
+func GetDeviceID() string {
+	id, _ := GetKV(KV_KEY_ID)
+	return id
+}
+
 func GetDeviceInfo() (Device, error) {
 	id, err := GetKV(KV_KEY_ID)
 	if err != nil {
@@ -74,6 +79,7 @@ func GetDeviceInfo() (Device, error) {
 			log.Printf("GetDeviceInfo get volume failed: %s", err.Error())
 		}
 		disks = append(disks, File{
+			Nid:         id,
 			Name:        info.Name(),
 			Path:        path,
 			Size:        info.Size(),
