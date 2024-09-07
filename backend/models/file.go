@@ -1,6 +1,8 @@
 package models
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"io"
 	"log"
 	"os"
@@ -14,6 +16,7 @@ type File struct {
 	Size        int64  `json:"size"`
 	UpdateTime  int64  `json:"update_time"`
 	IsDir       bool   `json:"is_dir"`
+	MD5         string `json:"md5"`
 	FreeVolume  int64  `json:"free_volume"`
 	TotalVolume int64  `json:"total_volume"`
 }
@@ -22,6 +25,7 @@ type File struct {
 func ListFiles(dir string) ([]File, error) {
 	var files []File
 	entries, err := os.ReadDir(dir)
+	log.Printf("ListFiles, dir=%s, entries=%d", dir, len(entries))
 	if err != nil {
 		return nil, err
 	}
@@ -45,10 +49,14 @@ func ListFiles(dir string) ([]File, error) {
 	return files, nil
 }
 
-func GetFileInfo(path string) (File, error) {
+func GetFileInfo(path string, needMD5 bool) (File, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return File{}, err
+	}
+	var md5str string
+	if needMD5 && !info.IsDir() {
+		md5str, _ = GetFileMD5(path)
 	}
 	return File{
 		Nid:        GetDeviceID(),
@@ -57,6 +65,7 @@ func GetFileInfo(path string) (File, error) {
 		Size:       info.Size(),
 		UpdateTime: info.ModTime().UnixMilli(),
 		IsDir:      info.IsDir(),
+		MD5:        md5str,
 	}, nil
 }
 
@@ -140,6 +149,43 @@ func DeleteFile(path string) error {
 
 func MoveFile(oldPath string, newPath string) error {
 	return os.Rename(oldPath, newPath)
+}
+
+func GetFileMD5(path string) (string, error) {
+	nBytes := 20
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+	var bytes []byte
+	if fileInfo.Size() <= int64(nBytes)*2 {
+		bytes = make([]byte, fileInfo.Size())
+		if _, err = file.Read(bytes); err != nil {
+			return "", err
+		}
+	} else {
+		firstBytes := make([]byte, nBytes)
+		if _, err = file.Read(firstBytes); err != nil {
+			return "", err
+		}
+		if _, err = file.Seek(-int64(nBytes), io.SeekEnd); err != nil {
+			return "", err
+		}
+		lastBytes := make([]byte, nBytes)
+		if _, err = file.Read(lastBytes); err != nil {
+			return "", err
+		}
+		bytes = append(firstBytes, lastBytes...)
+	}
+	hash := md5.Sum(bytes)
+	md5 := hex.EncodeToString(hash[:])
+	log.Printf("GetFileMD5, md5=%s, bytes=%x", md5, bytes)
+	return md5, nil
 }
 
 func WriteFileChunk(path string, offset int64, data []byte) error {
