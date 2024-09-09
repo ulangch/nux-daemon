@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ulangch/nas_desktop_app/backend/models"
@@ -27,7 +28,7 @@ func ListFilesHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status_code": 0, "status_message": "", "files": files})
+	c.JSON(http.StatusOK, gin.H{"status_code": 0, "status_message": M_SUCCESS, "files": files})
 }
 
 func GetFileInfoHandler(c *gin.Context) {
@@ -37,7 +38,7 @@ func GetFileInfoHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	file, err := models.GetFileInfo(decodePath, false)
+	file, err := models.GetFileInfo(decodePath)
 	if os.IsNotExist(err) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": nil})
 		return
@@ -51,31 +52,25 @@ func GetFileInfoHandler(c *gin.Context) {
 
 // ReadFileHandler handles reading a file
 func ReadFileHandler(c *gin.Context) {
-	path := c.Query("path")
-	decodePath, err := url.QueryUnescape(path)
+	path, err := url.QueryUnescape(c.Query("path"))
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
 		return
 	}
-	// 打开文件
-	file, err := os.Open(decodePath)
+	file, err := os.Open(path)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
 		return
 	}
-	// 确保在函数结束时关闭文件
 	defer file.Close()
-	// 获取文件信息
 	fileInfo, err := file.Stat()
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
 		return
 	}
-	// 设置下载文件的头信息
 	c.Header("Content-Disposition", "attachment; filename="+fileInfo.Name())
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("Content-Length", fmt.Sprint(fileInfo.Size()))
-	// 流式传输文件内容到响应
 	http.ServeFile(c.Writer, c.Request, path)
 }
 
@@ -137,11 +132,11 @@ func MoveFileHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	err = models.MoveFile(oldPath, newPath)
+	file, err := models.MoveFile(oldPath, newPath)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 	} else {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
+		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": file})
 	}
 }
 
@@ -203,6 +198,23 @@ func UploadFileHandler(c *gin.Context) {
 			}
 		}
 		os.RemoveAll(ckDirPath)
+		// Save file stat
+		lastModified, err := strconv.ParseInt(c.PostForm("last_modified"), 10, 64)
+		if err == nil && lastModified > 0 {
+			os.Chtimes(path, time.UnixMilli(lastModified), time.UnixMilli(lastModified))
+		}
+
+		// Save thumbnail if have
+		thumbnail, err := c.FormFile("thumb")
+		if err == nil {
+			thumDirPath := filepath.Join(fileDirPath, ".thumbnail")
+			if err := os.MkdirAll(thumDirPath, 0777); err == nil {
+				thumbFilePath := filepath.Join(thumDirPath, fmt.Sprintf("%s.JPEG", md5))
+				c.SaveUploadedFile(thumbnail, thumbFilePath)
+			}
+		}
+		// // Manage gallery
+		// isGallery, err := strconv.ParseBool(c.PostForm("is_gallery"))
 	}
 	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
 }
@@ -219,7 +231,7 @@ func GetUploadInfoHandler(c *gin.Context) {
 		return
 	}
 	var file any = nil
-	if fi, err := models.GetFileInfo(path, true); err == nil {
+	if fi, err := models.GetFileInfo(path); err == nil {
 		file = fi
 	}
 	ckDirPath := filepath.Join(filepath.Dir(path), ".uploads", md5)
@@ -241,34 +253,4 @@ func GetUploadInfoHandler(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": file, "ck_number": ckNumber})
-}
-
-func UploadFileHandler2(c *gin.Context) {
-	path := c.Query("path")
-	decodePath, err := url.QueryUnescape(path)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
-		return
-	}
-	offsetStr := c.Query("offset")
-	offset, err := strconv.ParseInt(offsetStr, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": "Invalid offset"})
-		return
-	}
-
-	// Read the file ck from the request body
-	data, err := io.ReadAll(c.Request.Body)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
-		return
-	}
-
-	// Upload the file ck
-	err = models.WriteFileChunk(decodePath, offset, data)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
 }

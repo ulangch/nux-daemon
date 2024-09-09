@@ -3,8 +3,8 @@ package models
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 )
@@ -12,11 +12,13 @@ import (
 type File struct {
 	Nid         string `json:"nid"`
 	Name        string `json:"name"`
-	Path        string `json:"path"`
+	Path        string
+	Url         string `json:"url"`
 	Size        int64  `json:"size"`
 	UpdateTime  int64  `json:"update_time"`
 	IsDir       bool   `json:"is_dir"`
 	MD5         string `json:"md5"`
+	Thumbnail   string `json:"thumbnail"`
 	FreeVolume  int64  `json:"free_volume"`
 	TotalVolume int64  `json:"total_volume"`
 }
@@ -25,9 +27,12 @@ type File struct {
 func ListFiles(dir string) ([]File, error) {
 	var files []File
 	entries, err := os.ReadDir(dir)
-	log.Printf("ListFiles, dir=%s, entries=%d", dir, len(entries))
 	if err != nil {
-		return nil, err
+		if os.IsNotExist(err) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
 	}
 	deviceID := GetDeviceID()
 	for _, entry := range entries {
@@ -35,52 +40,58 @@ func ListFiles(dir string) ([]File, error) {
 		if err != nil {
 			return nil, err
 		}
-		files = append(files, File{
-			Nid:        deviceID,
-			Name:       info.Name(),
-			Path:       filepath.Join(dir, info.Name()),
-			Size:       info.Size(),
-			UpdateTime: info.ModTime().UnixMilli(),
-			IsDir:      info.IsDir(),
-		})
+		files = append(files, PackFileByInfo(filepath.Join(dir, info.Name()), info, deviceID))
 	}
-	// 打印日志
-	// log.Printf("Files in directory %s: %v\n", dir, files)
 	return files, nil
 }
 
-func GetFileInfo(path string, needMD5 bool) (File, error) {
+func PackFileByInfo(path string, info os.FileInfo, nid string) File {
+	var md5 string
+	if !info.IsDir() {
+		md5, _ = GetFileMD5(path)
+	}
+	var thumbnail string
+	if md5 != "" && (isImage(info.Name()) || isVideo(info.Name())) {
+		thumbnail, _ = GetImageThumbnail(path, md5)
+		if thumbnail != "" {
+			thumbnail = fmt.Sprintf("nas://%s%s", nid, thumbnail)
+		}
+	}
+	return File{
+		Nid:        nid,
+		Name:       info.Name(),
+		Path:       path,
+		Url:        fmt.Sprintf("nas://%s%s", nid, path),
+		Size:       info.Size(),
+		UpdateTime: info.ModTime().UnixMilli(),
+		IsDir:      info.IsDir(),
+		MD5:        md5,
+		Thumbnail:  thumbnail,
+	}
+}
+
+func GetImageThumbnail(imagePath string, md5 string) (string, error) {
+	thumbnail := filepath.Join(filepath.Dir(imagePath), ".thumbnail", fmt.Sprintf("%s.JPEG", md5))
+	if _, err := os.Stat(thumbnail); err == nil {
+		return thumbnail, nil
+	} else {
+		return "", err
+	}
+}
+
+func GetFileInfo(path string) (File, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return File{}, err
 	}
-	var md5str string
-	if needMD5 && !info.IsDir() {
-		md5str, _ = GetFileMD5(path)
-	}
-	return File{
-		Nid:        GetDeviceID(),
-		Name:       info.Name(),
-		Path:       path,
-		Size:       info.Size(),
-		UpdateTime: info.ModTime().UnixMilli(),
-		IsDir:      info.IsDir(),
-		MD5:        md5str,
-	}, nil
+	return PackFileByInfo(path, info, GetDeviceID()), nil
 }
 
 // CreateFile creates a new file at the specified path
 func CreateFile(path string) (File, error) {
 	info, err := os.Stat(path)
 	if err == nil && !info.IsDir() {
-		return File{
-			Nid:        GetDeviceID(),
-			Name:       info.Name(),
-			Path:       path,
-			Size:       info.Size(),
-			UpdateTime: info.ModTime().UnixMilli(),
-			IsDir:      info.IsDir(),
-		}, nil
+		return PackFileByInfo(path, info, GetDeviceID()), nil
 	}
 	dirPath := filepath.Dir(path)
 	_, err = os.Stat(dirPath)
@@ -95,27 +106,13 @@ func CreateFile(path string) (File, error) {
 	if err != nil {
 		return File{}, err
 	}
-	return File{
-		Nid:        GetDeviceID(),
-		Name:       info.Name(),
-		Path:       path,
-		Size:       info.Size(),
-		UpdateTime: info.ModTime().UnixMilli(),
-		IsDir:      info.IsDir(),
-	}, nil
+	return PackFileByInfo(path, info, GetDeviceID()), nil
 }
 
 func CreateDirectory(path string) (File, error) {
 	info, err := os.Stat(path)
 	if err == nil && info.IsDir() {
-		return File{
-			Nid:        GetDeviceID(),
-			Name:       info.Name(),
-			Path:       path,
-			Size:       info.Size(),
-			UpdateTime: info.ModTime().UnixMilli(),
-			IsDir:      info.IsDir(),
-		}, nil
+		return PackFileByInfo(path, info, GetDeviceID()), nil
 	}
 	err = os.Mkdir(path, 0777)
 	if err != nil {
@@ -125,14 +122,7 @@ func CreateDirectory(path string) (File, error) {
 	if err != nil {
 		return File{}, err
 	}
-	return File{
-		Nid:        GetDeviceID(),
-		Name:       info.Name(),
-		Path:       path,
-		Size:       info.Size(),
-		UpdateTime: info.ModTime().UnixMilli(),
-		IsDir:      info.IsDir(),
-	}, nil
+	return PackFileByInfo(path, info, GetDeviceID()), nil
 }
 
 // DeleteFile deletes the file at the specified path
@@ -147,8 +137,16 @@ func DeleteFile(path string) error {
 	return os.RemoveAll(path)
 }
 
-func MoveFile(oldPath string, newPath string) error {
-	return os.Rename(oldPath, newPath)
+func MoveFile(oldPath string, newPath string) (File, error) {
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return File{}, err
+	}
+	fi, err := os.Stat(newPath)
+	if err != nil {
+		return File{}, err
+	} else {
+		return PackFileByInfo(newPath, fi, GetDeviceID()), nil
+	}
 }
 
 func GetFileMD5(path string) (string, error) {
@@ -184,25 +182,5 @@ func GetFileMD5(path string) (string, error) {
 	}
 	hash := md5.Sum(bytes)
 	md5 := hex.EncodeToString(hash[:])
-	log.Printf("GetFileMD5, md5=%s, bytes=%x", md5, bytes)
 	return md5, nil
-}
-
-func WriteFileChunk(path string, offset int64, data []byte) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	log.Printf("WriteFileChunk start, path=%s, offset=%d, data=%d", path, offset, len(data))
-
-	// Move the file pointer to the specified offset
-	_, err = file.Seek(offset, io.SeekStart)
-	if err != nil {
-		return err
-	}
-
-	// Write the data to the file
-	_, err = file.Write(data)
-	return err
 }

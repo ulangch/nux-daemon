@@ -22,5 +22,8 @@ func SetupRouter() *gin.Engine {
 	r.POST("/file/move", handlers.MoveFileHandler)
 	r.POST("/file/upload", handlers.UploadFileHandler)
 	r.GET("/file/upload_info", handlers.GetUploadInfoHandler)
+	r.GET("/gallery/list_files", handlers.ListGalleryFilesHandler)
+	r.GET("/gallery/get_dir", handlers.GetGalleryDirHandler)
+	r.POST("/gallery/update_dir", handlers.UpdateGalleryDirHandler)
 	return r
 }

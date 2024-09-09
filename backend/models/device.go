@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"os"
 	"syscall"
@@ -58,6 +59,10 @@ func GetDeviceInfo() (Device, error) {
 	var disks []File
 	for _, path := range paths {
 		info, err := os.Stat(path)
+		if err != nil && os.IsNotExist(err) {
+			os.MkdirAll(path, os.ModePerm)
+			info, err = os.Stat(path)
+		}
 		if err != nil {
 			log.Printf("GetDeviceInfo stat failed: %s", err.Error())
 			continue
@@ -82,6 +87,7 @@ func GetDeviceInfo() (Device, error) {
 			Nid:         id,
 			Name:        info.Name(),
 			Path:        path,
+			Url:         fmt.Sprintf("nas://%s%s", id, path),
 			Size:        info.Size(),
 			UpdateTime:  info.ModTime().UnixMilli(),
 			IsDir:       true,
