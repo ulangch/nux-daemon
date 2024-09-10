@@ -6,8 +6,6 @@ import (
 	"path/filepath"
 )
 
-const KV_KEY_GALLERY_DIR = "KV_KEY_GALLERY_DIR"
-
 func UpdateGalleryDir(path string) (File, error) {
 	fi, err := os.Stat(path)
 	if err != nil && os.IsNotExist(err) {
@@ -71,7 +69,7 @@ func ListGalleryFiles(clientModel string) ([]File, error) {
 			albumPath := filepath.Join(galleryDir.Path, entry.Name())
 			if albumEntries, err := os.ReadDir(albumPath); err == nil {
 				for _, albumEntry := range albumEntries {
-					if !albumEntry.IsDir() && (isImage(albumEntry.Name()) || isVideo(albumEntry.Name())) {
+					if !albumEntry.IsDir() && (IsImage(albumEntry.Name()) || IsVideo(albumEntry.Name())) {
 						if info, err := albumEntry.Info(); err == nil {
 							imagePath := filepath.Join(albumPath, info.Name())
 							imageFiles = append(imageFiles, PackFileByInfo(imagePath, info, deviceID))
@@ -79,7 +77,7 @@ func ListGalleryFiles(clientModel string) ([]File, error) {
 					}
 				}
 			}
-		} else if isImage(entry.Name()) || isVideo(entry.Name()) {
+		} else if IsImage(entry.Name()) || IsVideo(entry.Name()) {
 			// Image
 			if info, err := entry.Info(); err == nil {
 				imagePath := filepath.Join(galleryDir.Path, info.Name())

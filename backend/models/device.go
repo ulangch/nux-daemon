@@ -17,9 +17,6 @@ type Device struct {
 	Disks []File `json:"disks"`
 }
 
-const KV_KEY_ID = "KV_KEY_ID"
-const KV_KEY_NAME = "KV_KEY_NAME"
-const KV_KEY_DISKS = "KV_KEY_DISKS"
 const DEFAULT_DEVICE_NAME = "我的私有云"
 
 func InitializeDeviceID() {
@@ -35,6 +32,17 @@ func InitializeDeviceID() {
 func GetDeviceID() string {
 	id, _ := GetKV(KV_KEY_ID)
 	return id
+}
+
+func GetDeviceDisks() ([]File, error) {
+	device, err := GetDeviceInfo()
+	if err != nil {
+		return nil, err
+	}
+	if len(device.Disks) <= 0 {
+		return nil, errors.New("Device disks empty")
+	}
+	return device.Disks, nil
 }
 
 func GetDeviceInfo() (Device, error) {

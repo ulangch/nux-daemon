@@ -45,13 +45,36 @@ func ListFiles(dir string) ([]File, error) {
 	return files, nil
 }
 
+func ListTypeFiles(dir string, filterType string) ([]File, error) {
+	var files []File
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		} else {
+			return nil, err
+		}
+	}
+	deviceID := GetDeviceID()
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		if FilterFileByType(info.Name(), filterType) {
+			files = append(files, PackFileByInfo(filepath.Join(dir, info.Name()), info, deviceID))
+		}
+	}
+	return files, nil
+}
+
 func PackFileByInfo(path string, info os.FileInfo, nid string) File {
 	var md5 string
 	if !info.IsDir() {
 		md5, _ = GetFileMD5(path)
 	}
 	var thumbnail string
-	if md5 != "" && (isImage(info.Name()) || isVideo(info.Name())) {
+	if md5 != "" && (IsImage(info.Name()) || IsVideo(info.Name())) {
 		thumbnail, _ = GetImageThumbnail(path, md5)
 		if thumbnail != "" {
 			thumbnail = fmt.Sprintf("nas://%s%s", nid, thumbnail)

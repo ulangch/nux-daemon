@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -50,8 +49,7 @@ func GetFileInfoHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": file})
 }
 
-// ReadFileHandler handles reading a file
-func ReadFileHandler(c *gin.Context) {
+func StreamFileHandler(c *gin.Context) {
 	path, err := url.QueryUnescape(c.Query("path"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
@@ -74,7 +72,36 @@ func ReadFileHandler(c *gin.Context) {
 	http.ServeFile(c.Writer, c.Request, path)
 }
 
-// CreateFileHandler handles the creation of a new file
+func StreamThumbnailFileHandler(c *gin.Context) {
+	path, err := url.QueryUnescape(c.Query("path"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
+		return
+	}
+	md5, err := models.GetFileMD5(path)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
+		return
+	}
+	thumbnailPath := filepath.Join(filepath.Dir(path), ".thumbnail", fmt.Sprintf("%s.JPEG", md5))
+	thumbnail, err := os.Open(thumbnailPath)
+	if err != nil {
+		// TODO: Generate thumbnail
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
+		return
+	}
+	defer thumbnail.Close()
+	fileInfo, err := thumbnail.Stat()
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename="+fileInfo.Name())
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Length", fmt.Sprint(fileInfo.Size()))
+	http.ServeFile(c.Writer, c.Request, thumbnailPath)
+}
+
 func CreateFileHandler(c *gin.Context) {
 	path := c.Query("path")
 	decodePath, err := url.QueryUnescape(path)
@@ -119,6 +146,23 @@ func DeleteFileHandler(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
 	}
+}
+
+func BatchDeleteFileHandler(c *gin.Context) {
+	var request struct {
+		Paths []string `json:"paths"`
+	}
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	for _, path := range request.Paths {
+		if err := models.DeleteFile(path); err != nil {
+			c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
 }
 
 func MoveFileHandler(c *gin.Context) {
@@ -237,18 +281,18 @@ func GetUploadInfoHandler(c *gin.Context) {
 	ckDirPath := filepath.Join(filepath.Dir(path), ".uploads", md5)
 	var ckNumber = 0
 	if entries, err := os.ReadDir(ckDirPath); err == nil {
-		cks := make([]int, len(entries))
-		ckNumber = len(entries)
-		for _, entry := range entries {
-			if ck, err := strconv.ParseInt(strings.TrimSuffix(entry.Name(), ".ck"), 10, 64); err == nil {
-				if ck > 0 && ck <= int64(len(entries)) {
-					cks[ck-1] = int(ck)
+		for i := 1; i <= len(entries); i++ {
+			ckName := fmt.Sprintf("%d.ck", i)
+			hasCk := false
+			for _, entry := range entries {
+				if entry.Name() == ckName {
+					hasCk = true
+					break
 				}
 			}
-		}
-		for index, ck := range cks {
-			if ck <= 0 {
-				ckNumber = index
+			if !hasCk {
+				ckNumber = i
+				break
 			}
 		}
 	}
