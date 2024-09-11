@@ -281,6 +281,7 @@ func GetUploadInfoHandler(c *gin.Context) {
 	ckDirPath := filepath.Join(filepath.Dir(path), ".uploads", md5)
 	var ckNumber = 0
 	if entries, err := os.ReadDir(ckDirPath); err == nil {
+		ckNumber = len(entries)
 		for i := 1; i <= len(entries); i++ {
 			ckName := fmt.Sprintf("%d.ck", i)
 			hasCk := false
@@ -291,7 +292,7 @@ func GetUploadInfoHandler(c *gin.Context) {
 				}
 			}
 			if !hasCk {
-				ckNumber = i
+				ckNumber = i - 1
 				break
 			}
 		}

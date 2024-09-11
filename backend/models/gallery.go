@@ -64,6 +64,9 @@ func ListGalleryFiles(clientModel string) ([]File, error) {
 	deviceID := GetDeviceID()
 	var imageFiles []File
 	for _, entry := range entries {
+		if !FilterFile(entry.Name()) {
+			continue
+		}
 		if entry.IsDir() {
 			// Album
 			albumPath := filepath.Join(galleryDir.Path, entry.Name())

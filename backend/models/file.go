@@ -40,6 +40,9 @@ func ListFiles(dir string) ([]File, error) {
 		if err != nil {
 			return nil, err
 		}
+		if !FilterFile(entry.Name()) {
+			continue
+		}
 		files = append(files, PackFileByInfo(filepath.Join(dir, info.Name()), info, deviceID))
 	}
 	return files, nil
@@ -61,9 +64,13 @@ func ListTypeFiles(dir string, filterType string) ([]File, error) {
 		if err != nil {
 			return nil, err
 		}
-		if FilterFileByType(info.Name(), filterType) {
-			files = append(files, PackFileByInfo(filepath.Join(dir, info.Name()), info, deviceID))
+		if !FilterFile(entry.Name()) {
+			continue
 		}
+		if !FilterFileByType(info.Name(), filterType) {
+			continue
+		}
+		files = append(files, PackFileByInfo(filepath.Join(dir, info.Name()), info, deviceID))
 	}
 	return files, nil
 }

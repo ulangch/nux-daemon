@@ -97,6 +97,13 @@ func FilterFileByType(name string, filterType string) bool {
 	return false
 }
 
+func FilterFile(name string) bool {
+	if len(name) <= 0 || name[0] == '.' {
+		return false
+	}
+	return true
+}
+
 const KV_KEY_ID = "KV_KEY_ID"
 const KV_KEY_NAME = "KV_KEY_NAME"
 const KV_KEY_DISKS = "KV_KEY_DISKS"
