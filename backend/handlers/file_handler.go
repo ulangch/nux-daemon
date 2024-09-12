@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -72,6 +73,63 @@ func StreamFileHandler(c *gin.Context) {
 	http.ServeFile(c.Writer, c.Request, path)
 }
 
+func StreamSeekFileHandler(c *gin.Context) {
+	path, err := url.QueryUnescape(c.Query("path"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
+		return
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
+		return
+	}
+	defer file.Close()
+	fileInfo, err := file.Stat()
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
+		return
+	}
+	var start int64 = 0
+	var end int64 = fileInfo.Size() - 1
+	rangeHeader := c.GetHeader("Range")
+	if rangeHeader != "" {
+		ranges := strings.Split(rangeHeader, "=")
+		if len(ranges) != 2 || ranges[0] != "bytes" {
+			c.JSON(http.StatusRequestedRangeNotSatisfiable, gin.H{"status_message": "Invalid Range header"})
+			return
+		}
+		rangeParts := strings.Split(ranges[1], "-")
+		if len(rangeParts) != 2 {
+			c.JSON(http.StatusRequestedRangeNotSatisfiable, gin.H{"status_message": "Invalid Range header"})
+			return
+		}
+		start, err = strconv.ParseInt(rangeParts[0], 10, 64)
+		if err != nil {
+			c.JSON(http.StatusRequestedRangeNotSatisfiable, gin.H{"status_message": "Invalid Range header"})
+			return
+		}
+		if rangeParts[1] != "" {
+			end, err = strconv.ParseInt(rangeParts[1], 10, 64)
+			if err != nil {
+				c.JSON(http.StatusRequestedRangeNotSatisfiable, gin.H{"error": "Invalid Range header"})
+				return
+			}
+		}
+	}
+	if start > end || start < 0 || end >= fileInfo.Size() {
+		c.JSON(http.StatusRequestedRangeNotSatisfiable, gin.H{"error": "Invalid Range header"})
+		return
+	}
+	c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, fileInfo.Size()))
+	c.Header("Content-Length", fmt.Sprintf("%d", end-start+1))
+	c.Status(http.StatusPartialContent)
+
+	file.Seek(start, 0)
+	io.CopyN(c.Writer, file, end-start+1)
+}
+
 func StreamThumbnailFileHandler(c *gin.Context) {
 	path, err := url.QueryUnescape(c.Query("path"))
 	if err != nil {
@@ -83,7 +141,13 @@ func StreamThumbnailFileHandler(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
 		return
 	}
-	thumbnailPath := filepath.Join(filepath.Dir(path), ".thumbnail", fmt.Sprintf("%s.JPEG", md5))
+	disks, err := models.GetDeviceDisks()
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
+		return
+
+	}
+	thumbnailPath := filepath.Join(disks[0].Path, ".thumbnail", fmt.Sprintf("%s.JPEG", md5))
 	thumbnail, err := os.Open(thumbnailPath)
 	if err != nil {
 		// TODO: Generate thumbnail
@@ -250,15 +314,19 @@ func UploadFileHandler(c *gin.Context) {
 
 		// Save thumbnail if have
 		thumbnail, err := c.FormFile("thumb")
-		if err == nil {
-			thumDirPath := filepath.Join(fileDirPath, ".thumbnail")
-			if err := os.MkdirAll(thumDirPath, 0777); err == nil {
-				thumbFilePath := filepath.Join(thumDirPath, fmt.Sprintf("%s.JPEG", md5))
+		disks, diskErr := models.GetDeviceDisks()
+		if err == nil && diskErr == nil {
+			thumbDirPath := filepath.Join(disks[0].Path, ".thumbnail")
+			if err := os.MkdirAll(thumbDirPath, 0777); err == nil {
+				thumbFilePath := filepath.Join(thumbDirPath, fmt.Sprintf("%s.JPEG", md5))
 				c.SaveUploadedFile(thumbnail, thumbFilePath)
 			}
 		}
 		// // Manage gallery
 		// isGallery, err := strconv.ParseBool(c.PostForm("is_gallery"))
+
+		// Add record
+		models.AddRecentAddFiles([]string{path})
 	}
 	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
 }

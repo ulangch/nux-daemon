@@ -15,7 +15,7 @@ const FILE_TYPE_ZIP = "zip"
 var imageExtensions = []string{".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".svg", ".ico", ".heic"}
 var videoExtensions = []string{".mp4", ".avi", ".mkv", ".mov", ".flv", ".wmv", ".webm", ".mpg", ".mpeg", ".m4v", ".3gp", ".mts"}
 var audioExtensions = []string{".mp3", ".wav", ".flac", ".aac", ".ogg", ".wma", ".m4a", ".aiff", ".alac"}
-var documentExtensions = []string{".txt", ".md", ".rtf", ".odt", ".pdf", ".ppt", ".ai", ".psd", ".doc", ".docx", ".xls"}
+var documentExtensions = []string{".txt", ".md", ".rtf", ".odt", ".pdf", ".ppt", ".ai", ".psd", ".doc", ".docx", ".xls", ".xml"}
 var novelExtensions = []string{".txt"}
 var zipExtension = []string{".zip", ".rar"}
 

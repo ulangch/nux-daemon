@@ -24,8 +24,10 @@ func main() {
 	if err != nil {
 		panic("failed to connect database")
 	}
-	db.AutoMigrate(&models.KeyValue{})
+	db.AutoMigrate(&models.KeyValue{}, &models.Collection{}, &models.RecentOpenFile{}, &models.RecentAddFile{})
 	models.InitializeKVStore(db)
+	models.InitializeColStore(db)
+	models.InitializeRecentDB(db)
 
 	// Setup device
 	models.InitializeDeviceID()

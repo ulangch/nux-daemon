@@ -17,6 +17,7 @@ func SetupRouter() *gin.Engine {
 	r.GET("/file/list", handlers.ListFilesHandler)
 	r.GET("/file/info", handlers.GetFileInfoHandler)
 	r.GET("/file/stream", handlers.StreamFileHandler)
+	r.GET("/file/stream_seek", handlers.StreamSeekFileHandler)
 	r.GET("/file/stream_thumbnail", handlers.StreamThumbnailFileHandler)
 	r.POST("/file/create", handlers.CreateFileHandler)
 	r.POST("/file/mkdir", handlers.CreateDirectoryHandler)
@@ -37,5 +38,14 @@ func SetupRouter() *gin.Engine {
 	r.POST("/client/bucket/delete_dirs", handlers.DeleteBucketDirsHandler)
 	r.POST("/client/bucket/add_dirs", handlers.AddBucketDirsHandler)
 	r.GET("/client/bucket/list_files", handlers.ListBucketFilesHandler)
+
+	r.POST("/client/collect/add", handlers.CollectFilesHandler)
+	r.POST("/client/collect/delete", handlers.UnCollectFilesHandler)
+	r.GET("/client/collect/list_files", handlers.ListCollectFilesHandler)
+
+	r.POST("/client/recent/add_open_files", handlers.AddRecentOpenHandler)
+	r.GET("/client/recent/list_open_files", handlers.ListRecentOpenHandler)
+	r.GET("/client/recent/list_upload_files", handlers.ListRecentAddHandler)
+	r.GET("/client/recent/list_delete_files", handlers.ListRecentDeleteHandler)
 	return r
 }

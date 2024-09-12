@@ -38,7 +38,7 @@ func GetBucketDirs(clientModel string, bucket string) ([]File, error) {
 	var dirFiles []File
 	dirPathsJson, err := GetKV(bucketKey)
 	if err != nil || dirPathsJson == "" {
-		file, err := GetUploadDir(clientModel)
+		file, err := GetBucketDefaultDir(clientModel)
 		if err != nil {
 			return nil, err
 		} else {
@@ -57,6 +57,15 @@ func GetBucketDirs(clientModel string, bucket string) ([]File, error) {
 		}
 	}
 	return dirFiles, nil
+}
+
+func GetBucketDefaultDir(clientModel string) (File, error) {
+	disks, err := GetDeviceDisks()
+	if err != nil {
+		return File{}, err
+	}
+	dirPath := filepath.Join(disks[0].Path, clientModel)
+	return CreateDirectory(dirPath)
 }
 
 func AddBucketDirs(clientModel string, bucket string, paths []string) ([]File, error) {
@@ -124,19 +133,35 @@ func ListBucketFiles(clientModel string, bucket string) ([]File, error) {
 	if err != nil {
 		return nil, err
 	}
+	var logDirStr string
 	for _, file := range dirFiles {
 		dirPaths = append(dirPaths, file.Path)
+		logDirStr = logDirStr + file.Path + ", "
 	}
+	log.Printf("ListBucketFiles, dirFiles=%s", logDirStr)
 	if len(dirPaths) <= 0 {
 		return nil, errors.New("bucket dir invalid")
 	}
 	var bucketFiles []File
 	for _, path := range dirPaths {
-		if files, err := ListTypeFiles(path, bucket); err == nil {
+		if files, err := ListTypeFiles(path, bucket, 5); err == nil {
 			bucketFiles = append(bucketFiles, files...)
 		}
 	}
-	return bucketFiles, nil
+	var uniqueFiles []File
+	for _, file := range bucketFiles {
+		var hasSame = false
+		for _, unique := range uniqueFiles {
+			if file.Name == unique.Name && file.MD5 == unique.MD5 {
+				hasSame = true
+				break
+			}
+		}
+		if !hasSame {
+			uniqueFiles = append(uniqueFiles, file)
+		}
+	}
+	return uniqueFiles, nil
 }
 
 func FormatBucketDirsKey(bucket string) string {

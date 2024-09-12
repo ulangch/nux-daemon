@@ -19,6 +19,7 @@ type File struct {
 	IsDir       bool   `json:"is_dir"`
 	MD5         string `json:"md5"`
 	Thumbnail   string `json:"thumbnail"`
+	IsCollected bool   `json:"is_col"`
 	FreeVolume  int64  `json:"free_volume"`
 	TotalVolume int64  `json:"total_volume"`
 }
@@ -48,31 +49,50 @@ func ListFiles(dir string) ([]File, error) {
 	return files, nil
 }
 
-func ListTypeFiles(dir string, filterType string) ([]File, error) {
+func ListTypeFiles(dir string, filterType string, maxDepth int) ([]File, error) {
 	var files []File
+	if err := ListTypeFilesRecursive(&files, dir, filterType, 0, maxDepth); err != nil {
+		return nil, err
+	} else {
+		return files, nil
+	}
+}
+
+// List [filterType] files in [dir], depth start with 0, maxDepth should be equal or bigger than 0
+func ListTypeFilesRecursive(result *[]File, dir string, filterType string, depth int, maxDepth int) error {
+	if depth > maxDepth {
+		return nil
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return nil
 		} else {
-			return nil, err
+			return err
 		}
 	}
 	deviceID := GetDeviceID()
 	for _, entry := range entries {
 		info, err := entry.Info()
 		if err != nil {
-			return nil, err
+			return err
+		}
+		path := filepath.Join(dir, entry.Name())
+		if entry.IsDir() {
+			if depth < maxDepth {
+				ListTypeFilesRecursive(result, path, filterType, depth+1, maxDepth)
+			}
+			continue
 		}
 		if !FilterFile(entry.Name()) {
 			continue
 		}
-		if !FilterFileByType(info.Name(), filterType) {
+		if !FilterFileByType(entry.Name(), filterType) {
 			continue
 		}
-		files = append(files, PackFileByInfo(filepath.Join(dir, info.Name()), info, deviceID))
+		*result = append(*result, PackFileByInfo(path, info, deviceID))
 	}
-	return files, nil
+	return nil
 }
 
 func PackFileByInfo(path string, info os.FileInfo, nid string) File {
@@ -87,16 +107,18 @@ func PackFileByInfo(path string, info os.FileInfo, nid string) File {
 			thumbnail = fmt.Sprintf("nas://%s%s", nid, thumbnail)
 		}
 	}
+	isCollected := IsCollected(path)
 	return File{
-		Nid:        nid,
-		Name:       info.Name(),
-		Path:       path,
-		Url:        fmt.Sprintf("nas://%s%s", nid, path),
-		Size:       info.Size(),
-		UpdateTime: info.ModTime().UnixMilli(),
-		IsDir:      info.IsDir(),
-		MD5:        md5,
-		Thumbnail:  thumbnail,
+		Nid:         nid,
+		Name:        info.Name(),
+		Path:        path,
+		Url:         fmt.Sprintf("nas://%s%s", nid, path),
+		Size:        info.Size(),
+		UpdateTime:  info.ModTime().UnixMilli(),
+		IsDir:       info.IsDir(),
+		MD5:         md5,
+		Thumbnail:   thumbnail,
+		IsCollected: isCollected,
 	}
 }
 
@@ -115,6 +137,14 @@ func GetFileInfo(path string) (File, error) {
 		return File{}, err
 	}
 	return PackFileByInfo(path, info, GetDeviceID()), nil
+}
+
+func GetFileInfoWithNID(path string, nid string) (File, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return File{}, err
+	}
+	return PackFileByInfo(path, info, nid), nil
 }
 
 // CreateFile creates a new file at the specified path
@@ -144,7 +174,7 @@ func CreateDirectory(path string) (File, error) {
 	if err == nil && info.IsDir() {
 		return PackFileByInfo(path, info, GetDeviceID()), nil
 	}
-	err = os.Mkdir(path, 0777)
+	err = os.MkdirAll(path, 0777)
 	if err != nil {
 		return File{}, err
 	}
@@ -164,7 +194,9 @@ func DeleteFile(path string) error {
 		}
 		return err
 	}
-	return os.RemoveAll(path)
+	// return os.RemoveAll(path)
+	AddRecentDeleteFiles([]string{path})
+	return nil
 }
 
 func MoveFile(oldPath string, newPath string) (File, error) {
@@ -175,6 +207,7 @@ func MoveFile(oldPath string, newPath string) (File, error) {
 	if err != nil {
 		return File{}, err
 	} else {
+		MoveCollect(oldPath, newPath)
 		return PackFileByInfo(newPath, fi, GetDeviceID()), nil
 	}
 }
