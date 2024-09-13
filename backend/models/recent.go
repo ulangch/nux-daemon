@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -18,6 +19,12 @@ type RecentAddFile struct {
 	Time int64
 }
 
+type RecentDeleteFile struct {
+	Path         string `gorm:"primaryKey"`
+	OriginalPath string
+	Time         int64
+}
+
 type RecentStore struct {
 	db *gorm.DB
 }
@@ -32,6 +39,15 @@ func AddRecentOpenFiles(paths []string) {
 	for index, path := range paths {
 		open := RecentOpenFile{Path: path, Time: time.Now().UnixMilli() + int64(index)}
 		recentStore.db.Save(&open)
+	}
+}
+
+func MoveRecentOpenFile(oldPath string, newPath string) {
+	var recentOpen RecentOpenFile
+	if recentStore.db.First(&recentOpen, "path = ?", oldPath).Error == nil {
+		recentStore.db.Delete(&RecentOpenFile{}, "path = ?", oldPath)
+		recentOpen = RecentOpenFile{Path: newPath, Time: recentOpen.Time}
+		recentStore.db.Save(&recentOpen)
 	}
 }
 
@@ -55,6 +71,15 @@ func AddRecentAddFiles(paths []string) {
 	for index, path := range paths {
 		add := RecentAddFile{Path: path, Time: time.Now().UnixMilli() + int64(index)}
 		recentStore.db.Save(&add)
+	}
+}
+
+func MoveRecentAddFile(oldPath string, newPath string) {
+	var recentAdd RecentAddFile
+	if recentStore.db.First(&recentAdd, "path = ?", oldPath).Error == nil {
+		recentStore.db.Delete(&RecentAddFile{}, "path = ?", oldPath)
+		recentAdd = RecentAddFile{Path: newPath, Time: recentAdd.Time}
+		recentStore.db.Save(&recentAdd)
 	}
 }
 
@@ -84,19 +109,43 @@ func AddRecentDeleteFiles(paths []string) {
 		dir := filepath.Dir(path)
 		if deleteDirPath == "" || dir == deleteDirPath {
 			os.RemoveAll(path)
+			recentStore.db.Delete(&RecentDeleteFile{}, "path = ?", path)
 		} else {
 			deletePath := filepath.Join(deleteDirPath, fi.Name())
 			os.Rename(path, deletePath)
+			recentDelete := RecentDeleteFile{Path: deletePath, OriginalPath: path, Time: time.Now().UnixMilli()}
+			recentStore.db.Save(&recentDelete)
 		}
 	}
 }
 
+func RecoverRecentDeleteFiles(paths []string) error {
+	var recentDeletes []RecentDeleteFile
+	if err := recentStore.db.Find(&recentDeletes, "path IN (?)", paths).Error; err != nil {
+		return err
+	}
+	for _, delete := range recentDeletes {
+		os.Rename(delete.Path, delete.OriginalPath)
+	}
+	recentStore.db.Delete(&RecentDeleteFile{}, "path IN (?)", paths)
+	return nil
+}
+
 func ListRecentDeleteFiles() ([]File, error) {
-	deleteDirPath, err := GetRecentDeleteDirPath()
-	if err != nil {
+	var recentDeletes []RecentDeleteFile
+	if err := recentStore.db.Find(&recentDeletes).Error; err != nil {
 		return nil, err
 	}
-	return ListFiles(deleteDirPath)
+	nid := GetDeviceID()
+	var files []File
+	for _, delete := range recentDeletes {
+		if file, err := GetFileInfoWithNID(delete.Path, nid); err == nil {
+			file.UpdateTime = delete.Time
+			file.GhostUrl = fmt.Sprintf("nas://%s%s", nid, delete.OriginalPath)
+			files = append(files, file)
+		}
+	}
+	return files, nil
 }
 
 func GetRecentDeleteDirPath() (string, error) {

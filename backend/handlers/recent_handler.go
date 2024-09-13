@@ -44,3 +44,18 @@ func ListRecentDeleteHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "files": files})
 	}
 }
+
+func RecoverRecentDeleteHandler(c *gin.Context) {
+	var request struct {
+		Paths []string `json:"paths"`
+	}
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	if err := models.RecoverRecentDeleteFiles(request.Paths); err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
+	}
+}

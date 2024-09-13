@@ -248,6 +248,22 @@ func MoveFileHandler(c *gin.Context) {
 	}
 }
 
+func BatchMoveFilesHandler(c *gin.Context) {
+	var request struct {
+		Paths []string `json:"paths"`
+		Dir   string   `json:"dir"`
+	}
+	if err := c.BindJSON(&request); err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	if err := models.BatchMoveFiles(request.Paths, request.Dir); err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
+	} else {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
+	}
+}
+
 func UploadFileHandler(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"github.com/ulangch/nas_desktop_app/backend/routers"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func main() {
@@ -20,11 +21,13 @@ func main() {
 	log.Printf("Starting server on port %s with log level %s", config.AppConfig.ServerPort, config.AppConfig.LogLevel)
 
 	// Setup database
-	db, err := gorm.Open(sqlite.Open(config.AppConfig.DBPath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(config.AppConfig.DBPath), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
 		panic("failed to connect database")
 	}
-	db.AutoMigrate(&models.KeyValue{}, &models.Collection{}, &models.RecentOpenFile{}, &models.RecentAddFile{})
+	db.AutoMigrate(&models.KeyValue{}, &models.Collection{}, &models.RecentOpenFile{}, &models.RecentAddFile{}, &models.RecentDeleteFile{})
 	models.InitializeKVStore(db)
 	models.InitializeColStore(db)
 	models.InitializeRecentDB(db)

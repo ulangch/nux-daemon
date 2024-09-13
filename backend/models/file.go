@@ -20,6 +20,7 @@ type File struct {
 	MD5         string `json:"md5"`
 	Thumbnail   string `json:"thumbnail"`
 	IsCollected bool   `json:"is_col"`
+	GhostUrl    string `json:"ghost_url"` // only for recent delete
 	FreeVolume  int64  `json:"free_volume"`
 	TotalVolume int64  `json:"total_volume"`
 }
@@ -78,7 +79,7 @@ func ListTypeFilesRecursive(result *[]File, dir string, filterType string, depth
 			return err
 		}
 		path := filepath.Join(dir, entry.Name())
-		if entry.IsDir() {
+		if entry.IsDir() && entry.Name()[0] != '.' {
 			if depth < maxDepth {
 				ListTypeFilesRecursive(result, path, filterType, depth+1, maxDepth)
 			}
@@ -208,8 +209,29 @@ func MoveFile(oldPath string, newPath string) (File, error) {
 		return File{}, err
 	} else {
 		MoveCollect(oldPath, newPath)
+		MoveRecentOpenFile(oldPath, newPath)
+		MoveRecentAddFile(oldPath, newPath)
 		return PackFileByInfo(newPath, fi, GetDeviceID()), nil
 	}
+}
+
+func BatchMoveFiles(oldPaths []string, newDirPath string) error {
+	if _, err := os.Stat(newDirPath); err != nil {
+		if os.IsNotExist(err) {
+			os.MkdirAll(newDirPath, os.ModePerm)
+		} else {
+			return err
+		}
+	}
+	for _, oldPath := range oldPaths {
+		newPath := filepath.Join(newDirPath, filepath.Base(oldPath))
+		if os.Rename(oldPath, newPath) == nil {
+			MoveCollect(oldPath, newPath)
+			MoveRecentOpenFile(oldPath, newPath)
+			MoveRecentAddFile(oldPath, newPath)
+		}
+	}
+	return nil
 }
 
 func GetFileMD5(path string) (string, error) {

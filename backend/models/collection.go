@@ -1,14 +1,14 @@
 package models
 
 import (
-	"log"
-	"os"
+	"time"
 
 	"gorm.io/gorm"
 )
 
 type Collection struct {
 	Path string `gorm:"primaryKey"`
+	Time int64
 }
 
 type CollectionStore struct {
@@ -22,12 +22,8 @@ func InitializeColStore(db *gorm.DB) {
 }
 
 func CollectFiles(paths []string) {
-	for _, path := range paths {
-		if _, err := os.Stat(path); err != nil {
-			log.Printf("Collect invalid path=%s", path)
-			continue
-		}
-		collection := Collection{Path: path}
+	for index, path := range paths {
+		collection := Collection{Path: path, Time: time.Now().UnixMilli() + int64(index)}
 		colStore.db.Save(&collection)
 	}
 }
@@ -45,19 +41,24 @@ func IsCollected(path string) bool {
 }
 
 func MoveCollect(oldPath string, newPath string) {
-	UnCollectFiles([]string{oldPath})
-	CollectFiles([]string{newPath})
+	var collection Collection
+	if colStore.db.First(&collection, "path = ?", oldPath).Error == nil {
+		colStore.db.Delete(&Collection{}, "path = ?", oldPath)
+		collection = Collection{Path: newPath, Time: collection.Time}
+		colStore.db.Save(&collection)
+	}
 }
 
 func ListCollectFiles() ([]File, error) {
-	var paths []string
-	if err := colStore.db.Model(&Collection{}).Pluck("Path", &paths).Error; err != nil {
+	var collections []Collection
+	if err := colStore.db.Find(&collections).Error; err != nil {
 		return nil, err
 	}
 	var files []File
 	nid := GetDeviceID()
-	for _, path := range paths {
-		if file, err := GetFileInfoWithNID(path, nid); err == nil {
+	for _, collection := range collections {
+		if file, err := GetFileInfoWithNID(collection.Path, nid); err == nil {
+			file.UpdateTime = collection.Time
 			files = append(files, file)
 		}
 	}

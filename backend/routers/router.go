@@ -24,6 +24,7 @@ func SetupRouter() *gin.Engine {
 	r.POST("/file/delete", handlers.DeleteFileHandler)
 	r.POST("/file/delete_batch", handlers.BatchDeleteFileHandler)
 	r.POST("/file/move", handlers.MoveFileHandler)
+	r.POST("/file/move_batch", handlers.BatchMoveFilesHandler)
 	r.POST("/file/upload", handlers.UploadFileHandler)
 	r.GET("/file/upload_info", handlers.GetUploadInfoHandler)
 
@@ -47,5 +48,6 @@ func SetupRouter() *gin.Engine {
 	r.GET("/client/recent/list_open_files", handlers.ListRecentOpenHandler)
 	r.GET("/client/recent/list_upload_files", handlers.ListRecentAddHandler)
 	r.GET("/client/recent/list_delete_files", handlers.ListRecentDeleteHandler)
+	r.POST("/client/recent/recover_delete_files", handlers.RecoverRecentDeleteHandler)
 	return r
 }
