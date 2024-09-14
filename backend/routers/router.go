@@ -49,5 +49,8 @@ func SetupRouter() *gin.Engine {
 	r.GET("/client/recent/list_upload_files", handlers.ListRecentAddHandler)
 	r.GET("/client/recent/list_delete_files", handlers.ListRecentDeleteHandler)
 	r.POST("/client/recent/recover_delete_files", handlers.RecoverRecentDeleteHandler)
+
+	r.POST("/client/private_space/create", handlers.CreatePrivateSpaceHandler)
+	r.POST("/client/private_space/get", handlers.GetPrivateSpaceHandler)
 	return r
 }

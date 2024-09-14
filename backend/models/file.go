@@ -171,11 +171,15 @@ func CreateFile(path string) (File, error) {
 }
 
 func CreateDirectory(path string) (File, error) {
+	return CreateDirectoryPerm(path, os.ModePerm)
+}
+
+func CreateDirectoryPerm(path string, perm os.FileMode) (File, error){
 	info, err := os.Stat(path)
 	if err == nil && info.IsDir() {
 		return PackFileByInfo(path, info, GetDeviceID()), nil
 	}
-	err = os.MkdirAll(path, 0777)
+	err = os.MkdirAll(path, perm)
 	if err != nil {
 		return File{}, err
 	}

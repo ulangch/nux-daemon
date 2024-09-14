@@ -15,6 +15,8 @@ type Device struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Disks []File `json:"disks"`
+	PSID  string `json:"ps_id"`
+	PSDir File   `json:"ps_dir"`
 }
 
 const DEFAULT_DEVICE_NAME = "我的私有云"
@@ -35,35 +37,16 @@ func GetDeviceID() string {
 }
 
 func GetDeviceDisks() ([]File, error) {
-	device, err := GetDeviceInfo()
-	if err != nil {
-		return nil, err
-	}
-	if len(device.Disks) <= 0 {
-		return nil, errors.New("Device disks empty")
-	}
-	return device.Disks, nil
-}
-
-func GetDeviceInfo() (Device, error) {
-	id, err := GetKV(KV_KEY_ID)
-	if err != nil {
-		log.Printf("GetDeviceInfo GetID failed: %s", err.Error())
-		return Device{}, err
-	}
-	name, _ := GetKV(KV_KEY_NAME)
-	if name == "" {
-		name = DEFAULT_DEVICE_NAME
-	}
 	pathsJson, _ := GetKV(KV_KEY_DISKS)
 	var paths []string
 	if pathsJson != "" {
-		err = json.Unmarshal([]byte(pathsJson), &paths)
+		err := json.Unmarshal([]byte(pathsJson), &paths)
 		if err != nil {
 			log.Printf("GetDeviceInfo Unmarshal failed: %s", err.Error())
-			return Device{}, err
+			return nil, err
 		}
 	}
+	nid := GetDeviceID()
 	var disks []File
 	for _, path := range paths {
 		info, err := os.Stat(path)
@@ -92,10 +75,10 @@ func GetDeviceInfo() (Device, error) {
 			log.Printf("GetDeviceInfo get volume failed: %s", err.Error())
 		}
 		disks = append(disks, File{
-			Nid:         id,
+			Nid:         nid,
 			Name:        info.Name(),
 			Path:        path,
-			Url:         fmt.Sprintf("nas://%s%s", id, path),
+			Url:         fmt.Sprintf("nas://%s%s", nid, path),
 			Size:        info.Size(),
 			UpdateTime:  info.ModTime().UnixMilli(),
 			IsDir:       true,
@@ -103,7 +86,31 @@ func GetDeviceInfo() (Device, error) {
 			TotalVolume: int64(total),
 		})
 	}
-	return Device{ID: id, Name: name, Disks: disks}, nil
+	if len(disks) <= 0 {
+		return nil, errors.New("Device disks empty")
+	} else {
+		return disks, nil
+	}
+}
+
+func GetDeviceInfo() (Device, error) {
+	id, err := GetKV(KV_KEY_ID)
+	if err != nil {
+		log.Printf("GetDeviceInfo GetID failed: %s", err.Error())
+		return Device{}, err
+	}
+	name, _ := GetKV(KV_KEY_NAME)
+	if name == "" {
+		name = DEFAULT_DEVICE_NAME
+	}
+	disks, err := GetDeviceDisks()
+	if err != nil {
+		log.Printf("GetDeviceInfo GetDisks failed: %s", err.Error())
+		return Device{}, err
+	}
+	psId := GetPrivateSpaceSid()
+	psDir, _ := GetPrivateSpaceDir()
+	return Device{ID: id, Name: name, Disks: disks, PSID: psId, PSDir: psDir}, nil
 }
 
 func UpdateDeviceName(name string) error {
