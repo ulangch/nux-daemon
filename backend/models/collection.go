@@ -22,9 +22,12 @@ func InitializeColStore(db *gorm.DB) {
 }
 
 func CollectFiles(paths []string) {
+	psDirPath := GetPrivateSpaceDirPath()
 	for index, path := range paths {
-		collection := Collection{Path: path, Time: time.Now().UnixMilli() + int64(index)}
-		colStore.db.Save(&collection)
+		if !IsInPrivateSpaceDir2(path, psDirPath) {
+			collection := Collection{Path: path, Time: time.Now().UnixMilli() + int64(index)}
+			colStore.db.Save(&collection)
+		}
 	}
 }
 
@@ -44,8 +47,10 @@ func MoveCollect(oldPath string, newPath string) {
 	var collection Collection
 	if colStore.db.First(&collection, "path = ?", oldPath).Error == nil {
 		colStore.db.Delete(&Collection{}, "path = ?", oldPath)
-		collection = Collection{Path: newPath, Time: collection.Time}
-		colStore.db.Save(&collection)
+		if !IsInPrivateSpaceDir(newPath) {
+			collection = Collection{Path: newPath, Time: collection.Time}
+			colStore.db.Save(&collection)
+		}
 	}
 }
 

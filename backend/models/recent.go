@@ -36,9 +36,12 @@ func InitializeRecentDB(db *gorm.DB) {
 }
 
 func AddRecentOpenFiles(paths []string) {
+	psDirPath := GetPrivateSpaceDirPath()
 	for index, path := range paths {
-		open := RecentOpenFile{Path: path, Time: time.Now().UnixMilli() + int64(index)}
-		recentStore.db.Save(&open)
+		if !IsInPrivateSpaceDir2(path, psDirPath) {
+			open := RecentOpenFile{Path: path, Time: time.Now().UnixMilli() + int64(index)}
+			recentStore.db.Save(&open)
+		}
 	}
 }
 
@@ -46,8 +49,10 @@ func MoveRecentOpenFile(oldPath string, newPath string) {
 	var recentOpen RecentOpenFile
 	if recentStore.db.First(&recentOpen, "path = ?", oldPath).Error == nil {
 		recentStore.db.Delete(&RecentOpenFile{}, "path = ?", oldPath)
-		recentOpen = RecentOpenFile{Path: newPath, Time: recentOpen.Time}
-		recentStore.db.Save(&recentOpen)
+		if !IsInPrivateSpaceDir(newPath) {
+			recentOpen = RecentOpenFile{Path: newPath, Time: recentOpen.Time}
+			recentStore.db.Save(&recentOpen)
+		}
 	}
 }
 
@@ -68,9 +73,12 @@ func ListRecentOpenFiles() ([]File, error) {
 }
 
 func AddRecentAddFiles(paths []string) {
+	psDirPath := GetPrivateSpaceDirPath()
 	for index, path := range paths {
-		add := RecentAddFile{Path: path, Time: time.Now().UnixMilli() + int64(index)}
-		recentStore.db.Save(&add)
+		if !IsInPrivateSpaceDir2(path, psDirPath) {
+			add := RecentAddFile{Path: path, Time: time.Now().UnixMilli() + int64(index)}
+			recentStore.db.Save(&add)
+		}
 	}
 }
 
@@ -78,8 +86,10 @@ func MoveRecentAddFile(oldPath string, newPath string) {
 	var recentAdd RecentAddFile
 	if recentStore.db.First(&recentAdd, "path = ?", oldPath).Error == nil {
 		recentStore.db.Delete(&RecentAddFile{}, "path = ?", oldPath)
-		recentAdd = RecentAddFile{Path: newPath, Time: recentAdd.Time}
-		recentStore.db.Save(&recentAdd)
+		if !IsInPrivateSpaceDir(newPath) {
+			recentAdd = RecentAddFile{Path: newPath, Time: recentAdd.Time}
+			recentStore.db.Save(&recentAdd)
+		}
 	}
 }
 

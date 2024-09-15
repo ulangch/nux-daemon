@@ -77,6 +77,23 @@ func GetPrivateSpaceDir() (File, error) {
 	}
 }
 
+func GetPrivateSpaceDirPath() string {
+	if disks, err := GetDeviceDisks(); err == nil {
+		return filepath.Join(disks[0].Path, ".private")
+	} else {
+		return ""
+	}
+}
+
+func IsInPrivateSpaceDir(path string) bool {
+	psDirPath := GetPrivateSpaceDirPath()
+	return psDirPath != "" && strings.HasPrefix(path, psDirPath)
+}
+
+func IsInPrivateSpaceDir2(path string, psDirPath string) bool {
+	return psDirPath != "" && strings.HasPrefix(path, psDirPath)
+}
+
 func ValidateToken(encryptToken string) error {
 	if existEncryptToken, err := GetKV(KV_KEY_PRIVATE_SPACE_TOKEN); err != nil || existEncryptToken != encryptToken {
 		return errors.New("token invalid")
