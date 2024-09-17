@@ -27,6 +27,10 @@ func GetDiskUsage(path string) (DiskUsage, error) {
 	}
 }
 
-func EncodeFilePath(path string) string {
-	return path
+func EncodeFilePath(unixPath string) string {
+	return unixPath
+}
+
+func DecodeFilePath(unixPath string) string {
+	return unixPath
 }

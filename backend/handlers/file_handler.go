@@ -15,15 +15,15 @@ import (
 	"github.com/ulangch/nas_desktop_app/backend/models"
 )
 
+//  /[disk]/[path]
+
 // ListFilesHandler handles listing all files in a directory
 func ListFilesHandler(c *gin.Context) {
-	dir := c.Query("path")
-	decodedDir, err := url.QueryUnescape(dir)
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
-		return
 	}
-	files, err := models.ListFiles(decodedDir)
+	files, err := models.ListFiles(path)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 		return
@@ -32,13 +32,11 @@ func ListFilesHandler(c *gin.Context) {
 }
 
 func GetFileInfoHandler(c *gin.Context) {
-	path := c.Query("path")
-	decodePath, err := url.QueryUnescape(path)
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
-		return
 	}
-	file, err := models.GetFileInfo(decodePath)
+	file, err := models.GetFileInfo(path)
 	if os.IsNotExist(err) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": nil})
 		return
@@ -51,7 +49,7 @@ func GetFileInfoHandler(c *gin.Context) {
 }
 
 func StreamFileHandler(c *gin.Context) {
-	path, err := url.QueryUnescape(c.Query("path"))
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
 		return
@@ -74,7 +72,7 @@ func StreamFileHandler(c *gin.Context) {
 }
 
 func StreamSeekFileHandler(c *gin.Context) {
-	path, err := url.QueryUnescape(c.Query("path"))
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
 		return
@@ -131,7 +129,7 @@ func StreamSeekFileHandler(c *gin.Context) {
 }
 
 func StreamThumbnailFileHandler(c *gin.Context) {
-	path, err := url.QueryUnescape(c.Query("path"))
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"status_message": err.Error()})
 		return
@@ -167,13 +165,12 @@ func StreamThumbnailFileHandler(c *gin.Context) {
 }
 
 func CreateFileHandler(c *gin.Context) {
-	path := c.Query("path")
-	decodePath, err := url.QueryUnescape(path)
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	file, err := models.CreateFile(decodePath)
+	file, err := models.CreateFile(path)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 	} else {
@@ -182,13 +179,12 @@ func CreateFileHandler(c *gin.Context) {
 }
 
 func CreateDirectoryHandler(c *gin.Context) {
-	path := c.Query("path")
-	decodePath, err := url.QueryUnescape(path)
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	file, err := models.CreateDirectory(decodePath)
+	file, err := models.CreateDirectory(path)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 	} else {
@@ -198,13 +194,12 @@ func CreateDirectoryHandler(c *gin.Context) {
 
 // DeleteFileHandler handles deleting a file
 func DeleteFileHandler(c *gin.Context) {
-	path := c.Query("path")
-	decodePath, err := url.QueryUnescape(path)
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	err = models.DeleteFile(decodePath)
+	err = models.DeleteFile(path)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 	} else {
@@ -220,7 +215,12 @@ func BatchDeleteFileHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	for _, path := range request.Paths {
+	paths, err := models.GetRealPaths(request.Paths)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	for _, path := range paths {
 		if err := models.DeleteFile(path); err != nil {
 			c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 			return
@@ -230,12 +230,12 @@ func BatchDeleteFileHandler(c *gin.Context) {
 }
 
 func MoveFileHandler(c *gin.Context) {
-	oldPath, err := url.QueryUnescape(c.Query("old_path"))
+	oldPath, err := GetQueryRealPath(c, "old_path")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	newPath, err := url.QueryUnescape(c.Query("new_path"))
+	newPath, err := GetQueryRealPath(c, "new_path")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
@@ -257,7 +257,17 @@ func BatchMoveFilesHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	if err := models.BatchMoveFiles(request.Paths, request.Dir); err != nil {
+	paths, err := models.GetRealPaths(request.Paths)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	dir, err := models.GetRealPath(request.Dir)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	if err := models.BatchMoveFiles(paths, dir); err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 	} else {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
@@ -270,8 +280,8 @@ func UploadFileHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 		return
 	}
-	path := c.PostForm("path")
-	if path == "" {
+	path, err := models.GetRealPath(c.PostForm("path"))
+	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": "path invalid"})
 		return
 	}
@@ -348,7 +358,7 @@ func UploadFileHandler(c *gin.Context) {
 }
 
 func GetUploadInfoHandler(c *gin.Context) {
-	path, err := url.QueryUnescape(c.Query("path"))
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil || path == "" {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": "path invalid"})
 		return

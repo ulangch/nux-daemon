@@ -1,7 +1,6 @@
 package models
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -64,7 +63,7 @@ func ListRecentOpenFiles() ([]File, error) {
 	var files []File
 	nid := GetDeviceID()
 	for _, open := range opens {
-		if file, err := GetFileInfoWithNID(open.Path, nid); err == nil {
+		if file, err := GetFileInfo2(open.Path, nid); err == nil {
 			file.UpdateTime = open.Time
 			files = append(files, file)
 		}
@@ -101,7 +100,7 @@ func ListRecentAddFiles() ([]File, error) {
 	var files []File
 	nid := GetDeviceID()
 	for _, add := range adds {
-		if file, err := GetFileInfoWithNID(add.Path, nid); err == nil {
+		if file, err := GetFileInfo2(add.Path, nid); err == nil {
 			file.UpdateTime = add.Time
 			files = append(files, file)
 		}
@@ -149,10 +148,12 @@ func ListRecentDeleteFiles() ([]File, error) {
 	nid := GetDeviceID()
 	var files []File
 	for _, delete := range recentDeletes {
-		if file, err := GetFileInfoWithNID(delete.Path, nid); err == nil {
-			file.UpdateTime = delete.Time
-			file.GhostUrl = fmt.Sprintf("nas://%s%s", nid, delete.OriginalPath)
-			files = append(files, file)
+		if file, err := GetFileInfo2(delete.Path, nid); err == nil {
+			if ghostUrl, err := GetClientUrl(delete.OriginalPath, nid); err == nil {
+				file.UpdateTime = delete.Time
+				file.GhostUrl = ghostUrl
+				files = append(files, file)
+			}
 		}
 	}
 	return files, nil

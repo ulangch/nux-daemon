@@ -3,13 +3,16 @@ package models
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/ulangch/nas_desktop_app/backend/macro"
 )
+
+const DEFAULT_DEVICE_NAME = "我的私有云"
 
 type Device struct {
 	ID    string `json:"id"`
@@ -19,177 +22,167 @@ type Device struct {
 	PSDir File   `json:"ps_dir"`
 }
 
-const DEFAULT_DEVICE_NAME = "我的私有云"
+type Disk struct {
+	ID   string `json:"id"`
+	Name string `json:"name"` // Disk name
+	Path string `json:"path"` // Absolute disk dir path
+}
 
 func InitializeDeviceID() {
-	id, err := GetKV(KV_KEY_ID)
+	id, err := GetKV(KV_KEY_DEVICE_ID)
 	if err != nil {
 		log.Printf("InitializeDeviceID GetKV failed: %s", err.Error())
 	}
 	if id == "" {
-		PutKV(KV_KEY_ID, uuid.NewString())
+		PutKV(KV_KEY_DEVICE_ID, uuid.NewString())
 	}
 }
 
 func GetDeviceID() string {
-	id, _ := GetKV(KV_KEY_ID)
+	id, _ := GetKV(KV_KEY_DEVICE_ID)
 	return id
 }
 
-func GetDeviceDisks() ([]File, error) {
-	pathsJson, _ := GetKV(KV_KEY_DISKS)
-	var paths []string
-	if pathsJson != "" {
-		err := json.Unmarshal([]byte(pathsJson), &paths)
-		if err != nil {
-			log.Printf("GetDeviceInfo Unmarshal failed: %s", err.Error())
-			return nil, err
-		}
-	}
-	nid := GetDeviceID()
-	var disks []File
-	for _, path := range paths {
-		info, err := os.Stat(path)
-		if err != nil && os.IsNotExist(err) {
-			os.MkdirAll(path, os.ModePerm)
-			info, err = os.Stat(path)
-		}
-		if err != nil {
-			log.Printf("GetDeviceInfo stat failed: %s", err.Error())
-			continue
-		}
-		if !info.IsDir() {
-			log.Printf("GetDeviceInfo not a directory: %s", path)
-			continue
-		}
-
-		// Calculate total and free space
-		// var stat syscall.Statfs_t
-		// var total uint64
-		// var free uint64
-		// err = syscall.Statfs(path, &stat)
-		// if err == nil {
-		// 	total = stat.Blocks * uint64(stat.Bsize)
-		// 	free = stat.Bfree * uint64(stat.Bsize)
-		// } else {
-		// 	log.Printf("GetDeviceInfo get volume failed: %s", err.Error())
-		// }
-
-		path = macro.EncodeFilePath(path)
-
-		diskUsage, _ := macro.GetDiskUsage(path)
-		disks = append(disks, File{
-			Nid:         nid,
-			Name:        info.Name(),
-			Path:        path,
-			Url:         fmt.Sprintf("nas://%s%s", nid, path),
-			Size:        info.Size(),
-			UpdateTime:  info.ModTime().UnixMilli(),
-			IsDir:       true,
-			FreeVolume:  int64(diskUsage.Free),
-			TotalVolume: int64(diskUsage.Total),
-		})
-	}
-	if len(disks) <= 0 {
-		return nil, errors.New("Device disks empty")
-	} else {
-		return disks, nil
-	}
-}
-
 func GetDeviceInfo() (Device, error) {
-	id, err := GetKV(KV_KEY_ID)
+	nid, err := GetKV(KV_KEY_DEVICE_ID)
 	if err != nil {
-		log.Printf("GetDeviceInfo GetID failed: %s", err.Error())
-		return Device{}, err
+		return Device{}, errors.New("no device")
 	}
-	name, _ := GetKV(KV_KEY_NAME)
+	name, _ := GetKV(KV_KEY_DEVICE_NAME)
 	if name == "" {
 		name = DEFAULT_DEVICE_NAME
 	}
 	disks, err := GetDeviceDisks()
 	if err != nil {
-		log.Printf("GetDeviceInfo GetDisks failed: %s", err.Error())
-		return Device{}, err
+		return Device{}, errors.New("no disk")
+	}
+	var diskFiles []File
+	for _, disk := range disks {
+		realPath := disk.Path
+		info, err := os.Stat(realPath)
+		if err != nil && os.IsNotExist(err) {
+			os.MkdirAll(realPath, os.ModePerm)
+			info, err = os.Stat(realPath)
+		}
+		if err != nil || !info.IsDir() {
+			log.Printf("disk invalid: %s", realPath)
+			continue
+		}
+		file, err := PackFile4(realPath, info, nid, disk.ID)
+		if err != nil {
+			log.Printf("pack failed: %s", err.Error())
+			continue
+		}
+		usage, _ := macro.GetDiskUsage(realPath)
+		file.FreeVolume = usage.Free
+		file.TotalVolume = usage.Total
+		diskFiles = append(diskFiles, file)
 	}
 	psId := GetPrivateSpaceSid()
 	psDir, _ := GetPrivateSpaceDir()
-	return Device{ID: id, Name: name, Disks: disks, PSID: psId, PSDir: psDir}, nil
+	return Device{ID: nid, Name: name, Disks: diskFiles, PSID: psId, PSDir: psDir}, nil
 }
 
 func UpdateDeviceName(name string) error {
-	return PutKV(KV_KEY_NAME, name)
+	return PutKV(KV_KEY_DEVICE_NAME, name)
 }
 
-func AddDiskPath(path string, autoCreate bool) error {
+func GetDeviceDisks() ([]Disk, error) {
+	var disks []Disk
+	if disksJson, _ := GetKV(KV_KEY_DEVICE_DISKS); disksJson != "" {
+		if json.Unmarshal([]byte(disksJson), &disks) != nil {
+			return nil, errors.New("unmarshal failed")
+		}
+	}
+	if len(disks) <= 0 {
+		return nil, errors.New("no disk")
+	}
+	return disks, nil
+}
+
+func GetDeviceDiskId(realPath string) (string, error) {
+	disks, err := GetDeviceDisks()
+	if err != nil {
+		return "", errors.New("no disk")
+	}
+	for _, disk := range disks {
+		if strings.HasPrefix(realPath, disk.Path) {
+			return disk.ID, nil
+		}
+	}
+	return "", errors.New("disk not found")
+}
+
+// Absolute path for [id]
+// windows: F:\Storage\云空间
+// darwin: /Users/ulangch/云空间
+func GetDeviceDiskPath(id string) (string, error) {
+	return GetKV(KV_KEY_DEVICE_DISK_PREFIX + id)
+}
+
+func AddDiskPath(path string) error {
 	info, err := os.Stat(path)
-	if os.IsNotExist(err) && autoCreate {
+	if os.IsNotExist(err) {
 		os.MkdirAll(path, 0777)
 		info, err = os.Stat(path)
 	}
 	if err != nil {
-		log.Printf("AddDiskPath Stat failed: %s", err.Error())
-		return err
+		return errors.New("disk invalid")
 	}
 	if !info.IsDir() {
-		log.Printf("AddDiskPath path not a directory")
-		return errors.New("path not a directory")
+		return errors.New("disk not a directory")
 	}
-	pathsJson, _ := GetKV(KV_KEY_DISKS)
-	var paths []string
-	if pathsJson != "" {
-		err = json.Unmarshal([]byte(pathsJson), &paths)
-		if err != nil {
-			log.Printf("AddDiskPath Unmarshal failed: %s", err.Error())
-			return err
+	var disks []Disk
+	if disksJson, _ := GetKV(KV_KEY_DEVICE_DISKS); disksJson != "" {
+		if json.Unmarshal([]byte(disksJson), &disks) != nil {
+			return errors.New("unmarshal failed")
 		}
 	}
-	paths = append(paths, path)
-	pathsJsonBytes, err := json.Marshal(paths)
-	if err != nil {
-		log.Printf("AddDiskPath Marshal failed: %s", err.Error())
-		return err
+	diskId := GetStringMD5(path)
+	for _, disk := range disks {
+		if disk.ID == diskId || disk.Path == path {
+			return errors.New("disk already added")
+		}
 	}
-	pathsJson = string(pathsJsonBytes)
-	err = PutKV(KV_KEY_DISKS, pathsJson)
+	disks = append(disks, Disk{ID: diskId, Name: filepath.Base(path), Path: path})
+	disksJsonBytes, err := json.Marshal(disks)
 	if err != nil {
-		log.Printf("AddDiskPath PutKV failed: %s", err.Error())
-		return err
+		return errors.New("marshal failed")
 	}
-	return nil
+	if PutKV(KV_KEY_DEVICE_DISK_PREFIX+diskId, path) != nil {
+		return errors.New("store disk failed")
+	}
+	if PutKV(KV_KEY_DEVICE_DISKS, string(disksJsonBytes)) != nil {
+		return errors.New("store disk failed")
+	} else {
+		return nil
+	}
 }
 
 func RemoveDiskPath(path string) error {
-	pathsJson, err := GetKV(KV_KEY_DISKS)
-	if err != nil {
-		log.Printf("RemoveDiskPath GetKV failed: %s", err.Error())
-		return err
-	}
-	var paths []string
-	if pathsJson != "" {
-		err = json.Unmarshal([]byte(pathsJson), &paths)
-	}
-	if err != nil {
-		log.Printf("RemoveDiskPath Unmarshal failed: %s", err.Error())
-		return err
-	}
-	// paths = paths.remove()
-	var newPaths []string
-	for _, element := range paths {
-		if element != path {
-			newPaths = append(newPaths, element)
+	var disks []Disk
+	if disksJson, _ := GetKV(KV_KEY_DEVICE_DISKS); disksJson != "" {
+		if json.Unmarshal([]byte(disksJson), &disks) != nil {
+			return errors.New("unmarshal failed")
 		}
 	}
-	pathsJsonBytes, err := json.Marshal(newPaths)
-	if err != nil {
-		log.Printf("RemoveDiskPath Marshal failed: %s", err.Error())
-		return err
+	var existDisk Disk
+	var newDisks []Disk
+	for _, disk := range disks {
+		if disk.Path == path {
+			existDisk = disk
+		} else {
+			newDisks = append(newDisks, disk)
+		}
 	}
-	pathsJson = string(pathsJsonBytes)
-	err = PutKV(KV_KEY_DISKS, pathsJson)
+	disksJsonBytes, err := json.Marshal(newDisks)
 	if err != nil {
-		log.Printf("RemoveDiskPath PutKV failed: %s", err.Error())
-		return err
+		return errors.New("marshal failed")
 	}
-	return nil
+	if PutKV(KV_KEY_DEVICE_DISKS, string(disksJsonBytes)) != nil {
+		return errors.New("store disk failed")
+	} else {
+		DeleteKV(KV_KEY_DEVICE_DISK_PREFIX + existDisk.ID)
+		return nil
+	}
 }

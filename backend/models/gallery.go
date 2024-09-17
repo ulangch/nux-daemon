@@ -17,8 +17,7 @@ func UpdateGalleryDir(path string) (File, error) {
 	} else if err := PutKV(KV_KEY_GALLERY_DIR, path); err != nil {
 		return File{}, err
 	} else {
-		file := PackFileByInfo(path, fi, GetDeviceID())
-		return file, nil
+		return PackFile2(path, fi)
 	}
 }
 
@@ -37,7 +36,6 @@ func GetGalleryDir(clientModel string) (File, error) {
 	} else if path == "" {
 		return File{}, errors.New("unknown error")
 	} else {
-		var file File
 		fi, err := os.Stat(path)
 		if err != nil && os.IsNotExist(err) {
 			os.MkdirAll(path, os.ModePerm)
@@ -46,8 +44,7 @@ func GetGalleryDir(clientModel string) (File, error) {
 		if err != nil {
 			return File{}, err
 		} else {
-			file = PackFileByInfo(path, fi, GetDeviceID())
-			return file, nil
+			return PackFile2(path, fi)
 		}
 	}
 }
@@ -61,7 +58,11 @@ func ListGalleryFiles(clientModel string) ([]File, error) {
 	if err != nil {
 		return nil, err
 	}
-	deviceID := GetDeviceID()
+	nid := GetDeviceID()
+	diskId, err := GetDeviceDiskId(galleryDir.Path)
+	if err != nil {
+		return nil, err
+	}
 	var imageFiles []File
 	for _, entry := range entries {
 		if !FilterFile(entry.Name()) {
@@ -75,7 +76,9 @@ func ListGalleryFiles(clientModel string) ([]File, error) {
 					if !albumEntry.IsDir() && (IsImage(albumEntry.Name()) || IsVideo(albumEntry.Name())) {
 						if info, err := albumEntry.Info(); err == nil {
 							imagePath := filepath.Join(albumPath, info.Name())
-							imageFiles = append(imageFiles, PackFileByInfo(imagePath, info, deviceID))
+							if imageFile, err := PackFile4(imagePath, info, nid, diskId); err == nil {
+								imageFiles = append(imageFiles, imageFile)
+							}
 						}
 					}
 				}
@@ -84,7 +87,9 @@ func ListGalleryFiles(clientModel string) ([]File, error) {
 			// Image
 			if info, err := entry.Info(); err == nil {
 				imagePath := filepath.Join(galleryDir.Path, info.Name())
-				imageFiles = append(imageFiles, PackFileByInfo(imagePath, info, deviceID))
+				if imageFile, err := PackFile4(imagePath, info, nid, diskId); err == nil {
+					imageFiles = append(imageFiles, imageFile)
+				}
 			}
 		}
 	}

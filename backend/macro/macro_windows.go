@@ -45,9 +45,13 @@ func GetDiskUsage(path string) (DiskUsage, error) {
 	log.Printf("Total      %dmb", lpTotalNumberOfBytes/1024/1024.0)
 	log.Printf("Free       %dmb", lpTotalNumberOfFreeBytes/1024/1024.0)
 
-	return DiskUsage{Total: lpTotalNumberOfFreeBytes, Free: lpTotalNumberOfFreeBytes, Used: lpTotalNumberOfBytes - lpTotalNumberOfFreeBytes}, nil
+	return DiskUsage{Total: lpTotalNumberOfBytes, Free: lpTotalNumberOfFreeBytes, Used: lpTotalNumberOfBytes - lpTotalNumberOfFreeBytes}, nil
 }
 
-func EncodeFilePath(path string) string {
-	return filepath.ToSlash(path)
+func EncodeFilePath(unixPath string) string {
+	return filepath.ToSlash(unixPath)
+}
+
+func DecodeFilePath(unixPath string) string {
+	return filepath.FromSlash(unixPath)
 }

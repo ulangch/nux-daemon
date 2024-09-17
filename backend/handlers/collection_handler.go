@@ -15,7 +15,12 @@ func CollectFilesHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	models.CollectFiles(request.Paths)
+	paths, err := models.GetRealPaths(request.Paths)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	models.CollectFiles(paths)
 	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
 }
 
@@ -27,7 +32,12 @@ func UnCollectFilesHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	models.UnCollectFiles(request.Paths)
+	paths, err := models.GetRealPaths(request.Paths)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+		return
+	}
+	models.UnCollectFiles(paths)
 	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS})
 }
 

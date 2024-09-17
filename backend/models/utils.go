@@ -1,6 +1,8 @@
 package models
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"path/filepath"
 	"strings"
 )
@@ -104,9 +106,15 @@ func FilterFile(name string) bool {
 	return true
 }
 
-const KV_KEY_ID = "KV_KEY_ID"
-const KV_KEY_NAME = "KV_KEY_NAME"
-const KV_KEY_DISKS = "KV_KEY_DISKS"
+func GetStringMD5(str string) string {
+	hash := md5.Sum([]byte(str))
+	return hex.EncodeToString(hash[:])
+}
+
+const KV_KEY_DEVICE_ID = "KV_KEY_DEVICE_ID"
+const KV_KEY_DEVICE_NAME = "KV_KEY_DEVICE_NAME"
+const KV_KEY_DEVICE_DISKS = "KV_KEY_DEVICE_DISKS"
+const KV_KEY_DEVICE_DISK_PREFIX = "DISK_"
 const KV_KEY_GALLERY_DIR = "KV_KEY_GALLERY_DIR"
 const KV_KEY_UPLOAD_DIR = "KV_KEY_UPLOAD_DIR"
 const KV_KEY_BUCKET_DIRS = "KV_KEY_BUCKET_DIRS"

@@ -12,7 +12,7 @@ import (
 const KV_KEY_GALLERY_DIR = "KV_KEY_GALLERY_DIR"
 
 func UpdateGalleryDirHandler(c *gin.Context) {
-	path, err := url.QueryUnescape(c.Query("path"))
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
@@ -26,8 +26,9 @@ func UpdateGalleryDirHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 	} else if err := models.PutKV(KV_KEY_GALLERY_DIR, path); err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
+	} else if file, err := models.PackFile2(path, fi); err != nil {
+		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 	} else {
-		file := models.PackFileByInfo(path, fi, models.GetDeviceID())
 		c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "file": file})
 	}
 }

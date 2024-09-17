@@ -23,7 +23,7 @@ func GetUploadDirHandler(c *gin.Context) {
 }
 
 func SetUploadDirHandler(c *gin.Context) {
-	path, err := url.QueryUnescape(c.Query("path"))
+	path, err := GetQueryRealPath(c, "path")
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return

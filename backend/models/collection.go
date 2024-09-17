@@ -62,7 +62,7 @@ func ListCollectFiles() ([]File, error) {
 	var files []File
 	nid := GetDeviceID()
 	for _, collection := range collections {
-		if file, err := GetFileInfoWithNID(collection.Path, nid); err == nil {
+		if file, err := GetFileInfo2(collection.Path, nid); err == nil {
 			file.UpdateTime = collection.Time
 			files = append(files, file)
 		}

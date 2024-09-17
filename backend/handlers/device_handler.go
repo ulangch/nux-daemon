@@ -33,18 +33,17 @@ func UpdateDeviceNameHandler(c *gin.Context) {
 }
 
 func AddDiskPath(c *gin.Context) {
-	path := c.Query("path")
-	decodePath, err := url.QueryUnescape(path)
+	path, err := url.QueryUnescape(c.Query("path"))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
 		return
 	}
-	autoCreate, err := GetBoolQueryParam(c, "auto_create", false)
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
-		return
-	}
-	err = models.AddDiskPath(decodePath, autoCreate)
+	// autoCreate, err := GetBoolQueryParam(c, "auto_create", false)
+	// if err != nil {
+	// 	c.JSON(http.StatusOK, gin.H{"status_code": C_INVALID_PARAM, "status_message": err.Error()})
+	// 	return
+	// }
+	err = models.AddDiskPath(path)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"status_code": C_REQUEST_FAILED, "status_message": err.Error()})
 	} else {
