@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"syscall"
 
 	"github.com/google/uuid"
+	"github.com/ulangch/nas_desktop_app/backend/macro"
 )
 
 type Device struct {
@@ -64,16 +64,20 @@ func GetDeviceDisks() ([]File, error) {
 		}
 
 		// Calculate total and free space
-		var stat syscall.Statfs_t
-		var total uint64
-		var free uint64
-		err = syscall.Statfs(path, &stat)
-		if err == nil {
-			total = stat.Blocks * uint64(stat.Bsize)
-			free = stat.Bfree * uint64(stat.Bsize)
-		} else {
-			log.Printf("GetDeviceInfo get volume failed: %s", err.Error())
-		}
+		// var stat syscall.Statfs_t
+		// var total uint64
+		// var free uint64
+		// err = syscall.Statfs(path, &stat)
+		// if err == nil {
+		// 	total = stat.Blocks * uint64(stat.Bsize)
+		// 	free = stat.Bfree * uint64(stat.Bsize)
+		// } else {
+		// 	log.Printf("GetDeviceInfo get volume failed: %s", err.Error())
+		// }
+
+		path = macro.EncodeFilePath(path)
+
+		diskUsage, _ := macro.GetDiskUsage(path)
 		disks = append(disks, File{
 			Nid:         nid,
 			Name:        info.Name(),
@@ -82,8 +86,8 @@ func GetDeviceDisks() ([]File, error) {
 			Size:        info.Size(),
 			UpdateTime:  info.ModTime().UnixMilli(),
 			IsDir:       true,
-			FreeVolume:  int64(free),
-			TotalVolume: int64(total),
+			FreeVolume:  int64(diskUsage.Free),
+			TotalVolume: int64(diskUsage.Total),
 		})
 	}
 	if len(disks) <= 0 {
