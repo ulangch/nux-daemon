@@ -1,16 +1,23 @@
-import { fileURLToPath, URL } from 'node:url'
-
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import electron from 'vite-plugin-electron'
 
 // https://vitejs.dev/config/
+// export default defineConfig({
+//   plugins: [vue()],
+// })
+
 export default defineConfig({
   plugins: [
-    vue(),
+      vue(),
+      electron({
+          // 主进程入口文件
+          entry: './electron/main.js'
+      })
   ],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url))
-    }
+  /*开发服务器选项*/
+  server: {
+      // 端口
+      port: 3000,
   }
 })
