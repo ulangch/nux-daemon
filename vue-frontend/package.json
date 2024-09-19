@@ -14,9 +14,9 @@
     "appId": "com.uki.nas",
     "copyright": "com.uki.nas © 2024",
     "compression": "maximum",
-    "asar": true, 
+    "asar": true,
     "directories": {
-      "output": "release/" 
+      "output": "release/"
     },
     "nsis": {
       "oneClick": false,
@@ -28,7 +28,7 @@
       "shortcutName": "私有云"
     },
     "win": {
-      "icon": "./public/vite.svg",
+      "icon": "./dist/hasky.png",
       "artifactName": "${productName}-v${version}-${platform}-setup.${ext}",
       "target": [
         {
@@ -37,10 +37,11 @@
       ]
     },
     "mac": {
+      "icon": "./dist/hasky.png",
       "artifactName": "${productName}-v${version}-${platform}-setup.${ext}"
     },
     "linux": {
-      "icon": "./public/vite.svg",
+      "icon": "./dist/hasky.png",
       "artifactName": "${productName}-v${version}-${platform}-setup.${ext}"
     }
   },

@@ -12,7 +12,7 @@ const createWindow = () => {
         width: 800,
         height: 600,
         title: '我的私有云',
-        // icon: join(__dirname, '../public/vue.svg')
+        icon: join(__dirname, '../dist/hasky.png')
     })
 
     // win.loadURL('http://localhost:3000')
