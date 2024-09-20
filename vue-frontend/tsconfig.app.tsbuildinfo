@@ -1,1 +1,1 @@
-{"root":["./src/main.ts","./src/vite-env.d.ts","./src/app.vue","./src/pages/disksettingpage.vue","./src/pages/serverstatepage.vue"],"version":"5.6.2"}
+{"root":["./src/main.ts","./src/shims.vue.d.ts","./src/vite-env.d.ts","./src/app.vue","./src/components/circularprogress.vue","./src/pages/disksettingpage.vue","./src/pages/serverstatepage.vue"],"version":"5.6.2"}

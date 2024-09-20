@@ -4,11 +4,14 @@
       <span class="bar-title">服务状态信息</span>
       <button class="bar-refresh">刷新</button>
     </div>
+    <div>
+      <span v-if="notice.length > 0">{{ notice }}</span>
+    </div>
     <div class="sec" style="align-items: center">
       <div>
         <div style="display: flex; flex-direction: row">
           <span class="sec-title">设备名称：&nbsp;</span>
-          <span class="sec-content">我的私有云</span>
+          <span class="sec-content">{{ deviceName }}</span>
         </div>
         <span class="sec-hint" style="margin-top: 6px">设备名称将会展现在Android/iOS APP上。</span>
       </div>
@@ -17,29 +20,29 @@
     <div class="sec" style="flex-direction: column">
       <div style="display: flex; flex-direction: row">
         <span class="sec-title">设备标识：&nbsp;</span>
-        <span class="sec-content">20632f6e-30ae-4770-ab3f-634a4a0d4f6e</span>
+        <span class="sec-content">{{ deviceId }}</span>
       </div>
       <span class="sec-hint" style="margin-top: 6px">设备的唯一可识别ID，自动生成不可更改。</span>
     </div>
     <div class="sec" style="align-items: center">
       <div class="sec-sub" style="flex-direction: column">
         <span class="sec-title">本次运行</span>
-        <span class="sec-content" style="margin-top: 16px">0 天 0 时 51 分 47 秒</span>
+        <span class="sec-content" style="margin-top: 16px">{{ aliveDuration }}</span>
       </div>
       <div class="sec-sub" style="flex-direction: row">
-        <CircularProgress :percentage="cpuUsage.usage" :label="cpuUsage.label" style="margin-left: auto" />
-        <CircularProgress :percentage="memoryUsage.usage" :label="memoryUsage.label" style="margin-left: auto" />
+        <CircularProgress :percentage="cpu.usage" :label="cpu.label" style="margin-left: auto" />
+        <CircularProgress :percentage="memory.usage" :label="memory.label" style="margin-left: auto" />
       </div>
     </div>
     <div class="sec" style="align-items: center">
       <div>
         <span class="sec-title">局域网地址</span>
-        <span class="href-link" style="margin-top: 6px">http://192.168.31.20:8080</span>
+        <span class="href-link" style="margin-top: 6px">{{ deviceUrl }}</span>
         <span class="sec-hint" style="margin-top: 30px">使用APP扫描右侧二维码可主动绑定设备。</span>
       </div>
       <div class="sec-right">
         <div style="width: 100px; height: 100px; margin-left: auto; background-color: #d7d7d7">
-          <img style="width: 100%; height: 100%" v-if="false" />
+          <img style="width: 100%; height: 100%" v-if="qrcode" :src="qrcode" alt="Dynamic Image" />
         </div>
       </div>
     </div>
@@ -47,7 +50,7 @@
       <div>
         <div style="display: flex; flex-direction: row">
           <span class="sec-title">存储空间：&nbsp;</span>
-          <span class="sec-content">F:\我的资源库</span>
+          <span class="sec-content">{{ disk }}</span>
         </div>
         <span class="sec-hint" style="margin-top: 6px">更改存储空间后，原文件将无法在Android/iOS APP上访问。</span>
       </div>
@@ -61,18 +64,60 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue';
+import { onMounted, reactive, ref } from 'vue';
 import CircularProgress from '@/components/CircularProgress.vue';
+import axios from 'axios';
 
-const cpuUsage = reactive({
+import log from 'electron-log'
+
+const notice = ref('')
+const deviceName = ref('');
+const deviceId = ref('');
+const aliveDuration = ref('0 天 0 时 0 分 1 秒');
+const cpu = reactive({
   label: 'CPU',
-  usage: 20,
+  usage: 0,
 });
-
-const memoryUsage = reactive({
+const memory = reactive({
   label: '内存',
-  usage: 50,
+  usage: 0,
 });
+const deviceUrl = ref('');
+const qrcode = ref('');
+const disk = ref('');
+
+const fetchServiceInfo = async () => {
+  try {
+    const resp = await axios.get('http://localhost:8080/service/info');
+    const data = resp.data;
+    log.info('fetch service info, data=${data}')
+    // notice.value = data
+    if (data.status_code != 0) {
+      if (data.status_code == 4) {
+        notice.value = '请添加磁盘后刷新页面。'
+      } else {
+        notice.value = '当前服务不可用，请使用管理员权限打开APP。'
+      }
+    } else {
+      deviceName.value = data.name;
+      deviceId.value = data.id;
+      cpu.usage = data.cpu;
+      memory.usage = data.memory;
+      deviceUrl.value = data.url;
+      qrcode.value = data.qrcode;
+      disk.value = data.disk;
+    }
+  } catch (error) {
+    log.error('fetch service info failed: ', error)
+    // notice.value = '当前服务不可用。'
+    notice.value = String(error)
+  }
+};
+
+onMounted(() => {
+  fetchServiceInfo()
+})
+
 </script>
 
 <style scoped>

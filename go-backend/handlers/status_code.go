@@ -8,3 +8,4 @@ const C_REQUEST_FAILED = 2
 const M_REQUEST_FAILED = "request failed."
 
 const C_DISK_ALREADY_EXIST = 3
+const C_DISK_NOT_EXIST = 4

@@ -1,6 +1,7 @@
 package routers
 
 import (
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/ulangch/nas_desktop_app/backend/handlers"
 )
@@ -8,11 +9,22 @@ import (
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept"},
+		AllowCredentials: true,
+	}))
+
 	// Define routes
 	r.GET("/device/info", handlers.GetDeviceInfoHandler)
-	r.POST("/device/set_name", handlers.UpdateDeviceNameHandler)
-	r.POST("/device/add_disk", handlers.AddDiskPath)
-	r.POST("/device/remove_disk", handlers.RemoveDiskPath)
+	// r.POST("/device/set_name", handlers.UpdateDeviceNameHandler)
+	// r.POST("/device/add_disk", handlers.AddDiskPath)
+	// r.POST("/device/remove_disk", handlers.RemoveDiskPath)
+
+	r.GET("/service/info", handlers.GetServiceInfo)
+	r.POST("/service/update_name", handlers.UpdateDeviceName)
+	r.POST("/service/update_disk", handlers.UpdateDiskPath)
 
 	r.GET("/file/list", handlers.ListFilesHandler)
 	r.GET("/file/info", handlers.GetFileInfoHandler)

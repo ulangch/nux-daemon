@@ -5,6 +5,9 @@ import (
 	"encoding/hex"
 	"path/filepath"
 	"strings"
+
+	"github.com/skip2/go-qrcode"
+	"github.com/ulangch/nas_desktop_app/backend/config"
 )
 
 const FILE_TYPE_IMAGE = "image"
@@ -109,6 +112,18 @@ func FilterFile(name string) bool {
 func GetStringMD5(str string) string {
 	hash := md5.Sum([]byte(str))
 	return hex.EncodeToString(hash[:])
+}
+
+func GenQrCodeFile(data string, path string) error {
+	return qrcode.WriteFile(data, qrcode.Medium, 256, path)
+}
+
+func GenQrCodeData(nid string, url string) string {
+	return nid + ";;" + url
+}
+
+func GenServiceUrl(lan string) string {
+	return "http://" + lan + ":" + config.AppConfig.ServerPort
 }
 
 const KV_KEY_DEVICE_ID = "KV_KEY_DEVICE_ID"

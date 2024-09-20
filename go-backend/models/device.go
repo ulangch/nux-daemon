@@ -159,6 +159,50 @@ func AddDiskPath(path string) error {
 	}
 }
 
+func UpdateDiskPath(path string) error {
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		os.MkdirAll(path, 0777)
+		info, err = os.Stat(path)
+	}
+	if err != nil {
+		return errors.New("disk invalid")
+	}
+	if !info.IsDir() {
+		return errors.New("disk not a directory")
+	}
+	var disks []Disk
+	if disksJson, _ := GetKV(KV_KEY_DEVICE_DISKS); disksJson != "" {
+		if json.Unmarshal([]byte(disksJson), &disks) != nil {
+			return errors.New("unmarshal failed")
+		}
+	}
+	diskId := GetStringMD5(path)
+	for _, disk := range disks {
+		if disk.ID == diskId || disk.Path == path {
+			return errors.New("disk already added")
+		}
+	}
+	newDisks := []Disk{
+		{ID: diskId, Name: filepath.Base(path), Path: path},
+	}
+	disksJsonBytes, err := json.Marshal(newDisks)
+	if err != nil {
+		return errors.New("marshal failed")
+	}
+	if PutKV(KV_KEY_DEVICE_DISK_PREFIX+diskId, path) != nil {
+		return errors.New("store disk failed")
+	}
+	if PutKV(KV_KEY_DEVICE_DISKS, string(disksJsonBytes)) != nil {
+		return errors.New("store disk failed")
+	}
+	// 清除记录
+	for _, disk := range disks {
+		DeleteKV(KV_KEY_DEVICE_DISK_PREFIX + disk.ID)
+	}
+	return nil
+}
+
 func RemoveDiskPath(path string) error {
 	var disks []Disk
 	if disksJson, _ := GetKV(KV_KEY_DEVICE_DISKS); disksJson != "" {

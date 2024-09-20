@@ -12,13 +12,17 @@
         </router-link>
       </nav> -->
       <main>
-        <router-view />
+        <!-- <router-view /> -->
+        <ServerStatePage/>
       </main>
+      
     </div>
   </div>
 </template>
 
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import ServerStatePage from './pages/ServerStatePage.vue';
+</script>
 
 <style>
 .container {
