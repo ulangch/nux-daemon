@@ -1,13 +1,13 @@
 <template>
   <div>
-    <div style="display: flex; flex-direction: row; margin-bottom: 16px; align-items: center">
-      <span class="bar-title">服务状态信息</span>
-      <button class="bar-refresh">刷新</button>
+    <div style="display: flex; flex-direction: row; align-items: center">
+      <span class="bar-title">设备状态信息</span>
+      <button class="bar-refresh" @click="handleRefresh">刷新</button>
     </div>
-    <div>
-      <span v-if="notice.length > 0">{{ notice }}</span>
+    <div style="display: flex; flex-direction: column;">
+      <span v-if="notice" class="top-notice">{{ notice }}</span>
     </div>
-    <div class="sec" style="align-items: center">
+    <div class="sec" style="align-items: center; margin-top: 16px;">
       <div>
         <div style="display: flex; flex-direction: row">
           <span class="sec-title">设备名称：&nbsp;</span>
@@ -42,19 +42,20 @@
       </div>
       <div class="sec-right">
         <div style="width: 100px; height: 100px; margin-left: auto; background-color: #d7d7d7">
-          <img style="width: 100%; height: 100%" v-if="qrcode" :src="qrcode" alt="Dynamic Image" />
+          <img style="width: 100%; height: 100%" v-if="qrcode" :src="qrcode" />
         </div>
       </div>
     </div>
     <div class="sec" style="align-items: center">
       <div>
-        <div style="display: flex; flex-direction: row">
+        <div style="display: flex; flex-direction: row; align-items: center;">
           <span class="sec-title">存储空间：&nbsp;</span>
-          <span class="sec-content">{{ disk }}</span>
+          <span class="sec-content" v-if="disk">{{ disk }}</span>
+          <span class="sec-content-notice" v-if="diskNotice">{{ diskNotice }}</span>
         </div>
         <span class="sec-hint" style="margin-top: 6px">更改存储空间后，原文件将无法在Android/iOS APP上访问。</span>
       </div>
-      <img src="../assets/ic_edit_66.svg" style="width: 22px; height: 22px; margin-left: auto; padding-left: 12px; padding-right: 12px" />
+      <img src="../assets/ic_edit_66.svg" style="width: 22px; height: 22px; margin-left: auto; padding-left: 12px; padding-right: 12px" @click="selectFolder" />
     </div>
 
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: 40px">
@@ -67,8 +68,6 @@
 import { onMounted, reactive, ref } from 'vue';
 import CircularProgress from '@/components/CircularProgress.vue';
 import axios from 'axios';
-
-import log from 'electron-log'
 
 const notice = ref('')
 const deviceName = ref('');
@@ -83,36 +82,55 @@ const memory = reactive({
   usage: 0,
 });
 const deviceUrl = ref('');
-const qrcode = ref('');
+const qrcode = ref('')
 const disk = ref('');
+const diskNotice = ref('');
+
+const handleRefresh = () => {
+  fetchServiceInfo()
+}
 
 const fetchServiceInfo = async () => {
   try {
     const resp = await axios.get('http://localhost:8080/service/info');
     const data = resp.data;
-    log.info('fetch service info, data=${data}')
-    // notice.value = data
-    if (data.status_code != 0) {
-      if (data.status_code == 4) {
-        notice.value = '请添加磁盘后刷新页面。'
-      } else {
-        notice.value = '当前服务不可用，请使用管理员权限打开APP。'
-      }
+    const info = data.info
+    if (!data || data.status_code != 0 || !info) {
+       notice.value = '当前服务不可用，请使用管理员权限打开APP。'
     } else {
-      deviceName.value = data.name;
-      deviceId.value = data.id;
-      cpu.usage = data.cpu;
-      memory.usage = data.memory;
-      deviceUrl.value = data.url;
-      qrcode.value = data.qrcode;
-      disk.value = data.disk;
+      deviceName.value = info.name;
+      deviceId.value = info.id;
+      cpu.usage = info.cpu;
+      memory.usage = info.memory;
+      deviceUrl.value = info.url;
+      qrcode.value = `file://${info.qrcode.replaceAll('\\', '/')}`
+      if (info.disk) {
+        notice.value = ''
+        disk.value = info.disk;
+        diskNotice.value = ''
+      } else {
+        notice.value = '当前还没有为设备添加存储空间，Android/iOS APP将无法正常访问，请点击【存储空间】右侧【编辑】图标添加。'
+        disk.value = ''
+        diskNotice.value = '点击右侧【编辑】图标添加存储空间。'
+      }
     }
   } catch (error) {
-    log.error('fetch service info failed: ', error)
-    // notice.value = '当前服务不可用。'
-    notice.value = String(error)
+    window.electron.log.error('fetch service info failed')
+    notice.value = '当前服务不可用，请使用管理员权限打开APP。'
   }
 };
+
+const selectFolder = async () => {
+  try {
+    const path = await window.electron.selectFolder()
+    if (path) {
+      await axios.post(`http://localhost:8080/service/update_disk?path=${encodeURIComponent(path)}`)
+    }
+    fetchServiceInfo()
+  } catch (error) {
+    window.electron.log.error('select folder failed')
+  }
+}
 
 onMounted(() => {
   fetchServiceInfo()
@@ -144,6 +162,13 @@ onMounted(() => {
   border-width: 0px;
   stroke-width: 0px;
 }
+.top-notice {
+  color: #ff0000;
+  font-size: 13px;
+  margin-left: 4px;
+  margin-top: 12px;
+  font-weight: 400;
+}
 .sec {
   display: flex;
   padding: 14px;
@@ -173,6 +198,12 @@ onMounted(() => {
   color: #676767;
   font-weight: 400;
   font-size: 15px;
+}
+.sec-content-notice {
+  display: flex;
+  color: #ff0000;
+  font-weight: 400;
+  font-size: 13px;
 }
 .sec-hint {
   display: flex;

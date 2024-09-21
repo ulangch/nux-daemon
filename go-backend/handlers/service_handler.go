@@ -6,12 +6,12 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/ulangch/nas_desktop_app/backend/macro"
 	"github.com/ulangch/nas_desktop_app/backend/models"
 )
 
@@ -35,11 +35,6 @@ func GetServiceInfo(c *gin.Context) {
 	if err != nil {
 		name = models.DEFAULT_DEVICE_NAME
 	}
-	disks, err := models.GetDeviceDisks()
-	if err != nil || len(disks) <= 0 {
-		c.JSON(http.StatusOK, gin.H{"status_code": C_DISK_NOT_EXIST, "status_message": "no device disk"})
-		return
-	}
 	var cpuUsage int
 	if cpuPercents, err := cpu.Percent(0, false); err == nil {
 		log.Printf("GetServiceInfo, cpuUsage=%f", cpuPercents[0])
@@ -60,13 +55,15 @@ func GetServiceInfo(c *gin.Context) {
 	}
 	var qrcode string
 	if url != "" {
-		qcPath := filepath.Join(disks[0].Path, ".system")
-		os.MkdirAll(qcPath, os.ModePerm)
-		qcPath = filepath.Join(qcPath, "qc_device.png")
+		qcPath := filepath.Join(macro.GetSystemDirPath(), "qc_device.png")
 		qcData := models.GenQrCodeData(nid, url)
 		if models.GenQrCodeFile(qcData, qcPath) == nil {
 			qrcode = qcPath
 		}
+	}
+	var diskPath string
+	if disks, err := models.GetDeviceDisks(); err == nil && len(disks) > 0 {
+		diskPath = disks[0].Path
 	}
 	c.JSON(http.StatusOK, gin.H{"status_code": C_SUCCESS, "status_message": M_SUCCESS, "info": ServiceInfo{
 		Name:   name,
@@ -75,7 +72,7 @@ func GetServiceInfo(c *gin.Context) {
 		Memory: memUsage,
 		Url:    url,
 		QRCode: qrcode,
-		Disk:   disks[0].Path,
+		Disk:   diskPath,
 	}})
 }
 

@@ -5,11 +5,12 @@ package macro
 
 import (
 	"log"
+	"path/filepath"
 	"syscall"
 )
 
 func GetDatabasePath() string {
-	return "my-nas-app.db"
+	return filepath.Join(GetSystemDirPath(), "nas-daemon-darwin.db")
 }
 
 func GetDiskUsage(path string) (DiskUsage, error) {

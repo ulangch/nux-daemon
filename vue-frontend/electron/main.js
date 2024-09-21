@@ -1,5 +1,5 @@
 // electron/main.js
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const { join } = require('path');
 const { spawn } = require('child_process')
 const path = require('path');
@@ -14,6 +14,11 @@ const createWindow = () => {
     height: 800,
     title: '我的私有云',
     icon: join(__dirname, '../dist/hasky.png'),
+    webPreferences: {
+      preload: join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: true,
+    }
   });
 
   Menu.setApplicationMenu(null);
@@ -32,7 +37,6 @@ const log = require('electron-log');
 log.transports.file.resolvePathFn = () => path.join(app.getPath('logs'), 'main.log')
 
 let daemon
-
 const startDaemon = () => {
   let daemonPath
   if (process.env.VITE_DEV_SERVER_URL) {
@@ -74,4 +78,11 @@ app.on('will-quit', () => {
   if (daemon) {
     daemon.kill()
   }
+});
+
+ipcMain.handle('select-folder', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory']
+  })
+  return result.filePaths[0]
 });

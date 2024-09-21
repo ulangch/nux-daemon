@@ -3,6 +3,7 @@ package main
 import (
 	// "github.com/gin-gonic/gin"
 	"log"
+	"os"
 
 	"github.com/ulangch/nas_desktop_app/backend/config"
 	"github.com/ulangch/nas_desktop_app/backend/models"
@@ -18,10 +19,19 @@ func main() {
 
 	// Set log level
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.Printf("Starting server on port %s with log level %s", config.AppConfig.ServerPort, config.AppConfig.LogLevel)
+	log.Printf("starting server on port %s with log level %s", config.AppConfig.ServerPort, config.AppConfig.LogLevel)
+
+	dbPath := config.AppConfig.DBPath
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		file, err := os.Create(dbPath)
+		if err != nil {
+			log.Fatalf("failed to create database file: %v", err)
+		}
+		file.Close()
+	}
 
 	// Setup database
-	db, err := gorm.Open(sqlite.Open(config.AppConfig.DBPath), &gorm.Config{
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {

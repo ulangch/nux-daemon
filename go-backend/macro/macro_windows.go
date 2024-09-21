@@ -11,7 +11,7 @@ import (
 )
 
 func GetDatabasePath() string {
-	return "my-nas-app-windows.db"
+	return filepath.Join(GetSystemDirPath(), "nas-daemon-windows.db")
 }
 
 func GetDiskUsage(path string) (DiskUsage, error) {
