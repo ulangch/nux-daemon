@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld("electron", {
       error: (message) => log.error(message),
       warn: (message) => log.warn(message)
   },
-  selectFolder: () => ipcRenderer.invoke('select-folder')
+  selectFolder: () => ipcRenderer.invoke('select-folder'),
+  restart: () => ipcRenderer.invoke('restart')
 })

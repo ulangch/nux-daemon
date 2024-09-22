@@ -13,6 +13,7 @@ interface ElectronLogAPI {
 interface ElectronAPI {
   log: ElectronLogAPI;
   selectFolder: () => Promise<string>;
+  restart: () => Promise<void>;
 }
 
 interface Window {

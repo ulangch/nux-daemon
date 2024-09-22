@@ -3,6 +3,7 @@ package models
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"net"
 	"path/filepath"
 	"strings"
 
@@ -124,6 +125,44 @@ func GenQrCodeData(nid string, url string) string {
 
 func GenServiceUrl(lan string) string {
 	return "http://" + lan + ":" + config.AppConfig.ServerPort
+}
+
+func GetLocalIPV4() string {
+	if ifaces, err := net.Interfaces(); err == nil {
+		for _, iface := range ifaces {
+			if IsVirtualIface(iface) {
+				continue
+			}
+			if addrs, err := iface.Addrs(); err == nil {
+				for _, addr := range addrs {
+					if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() && ipNet.IP.To4() != nil && IsPrivateIPV4(ipNet.IP) {
+						return ipNet.IP.String()
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func IsVirtualIface(iface net.Interface) bool {
+	ifaceName := strings.ToLower(iface.Name)
+	return strings.HasPrefix(ifaceName, "vboxnet") || strings.HasPrefix(ifaceName, "vmnet") || strings.HasPrefix(ifaceName, "docker") || strings.HasPrefix(ifaceName, "virtualbox")
+}
+
+func IsPrivateIPV4(ip net.IP) bool {
+	privateIPBlocks := []*net.IPNet{
+		{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(8, 32)},
+		{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(12, 32)},
+		{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)},
+	}
+
+	for _, block := range privateIPBlocks {
+		if block.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 const KV_KEY_DEVICE_ID = "KV_KEY_DEVICE_ID"

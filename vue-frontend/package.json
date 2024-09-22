@@ -24,8 +24,8 @@
     ],
     "extraResources": [
       {
-        "from": "public/",
-        "to": "public",
+        "from": "extras/",
+        "to": "extras",
         "filter": [
           "**/*"
         ]

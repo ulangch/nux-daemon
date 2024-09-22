@@ -15,8 +15,9 @@
         </div>
         <span class="sec-hint" style="margin-top: 6px">设备名称将会展现在Android/iOS APP上。</span>
       </div>
-      <img src="../assets/ic_edit_66.svg" style="width: 22px; height: 22px; margin-left: auto; padding-left: 12px; padding-right: 12px" />
+      <img src="../assets/ic_edit_66.svg" style="width: 22px; height: 22px; margin-left: auto; padding-left: 12px; padding-right: 12px" @click="showEditNameDialog"/>
     </div>
+    <EditNameDialog :visible="isEditNameShow" title="修改设备名" @confirm="handleEditNameConfirm" @cancel="handleEditNameCancel"/>
     <div class="sec" style="flex-direction: column">
       <div style="display: flex; flex-direction: row">
         <span class="sec-title">设备标识：&nbsp;</span>
@@ -59,20 +60,22 @@
     </div>
 
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%; margin-top: 40px">
-      <button class="start-button">重新启动服务</button>
+      <button class="start-button" @click="restartApp">重新启动服务</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import CircularProgress from '@/components/CircularProgress.vue';
 import axios from 'axios';
+import EditNameDialog from '../components/EditNameDialog.vue';
 
 const notice = ref('')
 const deviceName = ref('');
 const deviceId = ref('');
 const aliveDuration = ref('0 天 0 时 0 分 1 秒');
+const startTime = Date.now();
 const cpu = reactive({
   label: 'CPU',
   usage: 0,
@@ -85,10 +88,21 @@ const deviceUrl = ref('');
 const qrcode = ref('')
 const disk = ref('');
 const diskNotice = ref('');
+const isEditNameShow = ref(false)
+let intervalId: number
+
+onMounted(() => {
+  intervalId = window.setInterval(updateAliveDuration, 1000)
+  fetchServiceInfo()
+});
+
+onBeforeUnmount(() => {
+  window.clearInterval(intervalId)
+});
 
 const handleRefresh = () => {
   fetchServiceInfo()
-}
+};
 
 const fetchServiceInfo = async () => {
   try {
@@ -123,18 +137,54 @@ const fetchServiceInfo = async () => {
 const selectFolder = async () => {
   try {
     const path = await window.electron.selectFolder()
-    if (path) {
+    window.electron.log.info(`select folder=${path}`)
+    if (path.length > 0) {
       await axios.post(`http://localhost:8080/service/update_disk?path=${encodeURIComponent(path)}`)
     }
     fetchServiceInfo()
   } catch (error) {
-    window.electron.log.error('select folder failed')
+    window.electron.log.error('update disk failed')
   }
-}
+};
 
-onMounted(() => {
-  fetchServiceInfo()
-})
+const showEditNameDialog = () => {
+  isEditNameShow.value = true
+};
+
+const handleEditNameConfirm = async (text: string) => {
+  isEditNameShow.value = false
+  window.electron.log.info(`edit name=${text}`)
+  try {
+    if (text.length > 0) {
+      await axios.post(`http://localhost:8080/service/update_name?name=${encodeURIComponent(text)}`)
+    }
+    fetchServiceInfo()
+  } catch (error) {
+    window.electron.log.error('update name failed')
+  }
+};
+
+const handleEditNameCancel = () => {
+  isEditNameShow.value = false
+};
+
+const updateAliveDuration = () => {
+  const now = Date.now()
+  const elapsedTime = (now - startTime) / 1000
+  const seconds = Math.floor(elapsedTime) % 60
+  const minutes = Math.floor(elapsedTime / 60) % 60
+  const hours = Math.floor(elapsedTime / (60 * 60)) % 24
+  const days = Math.floor(elapsedTime / (60 * 60 * 24))
+  aliveDuration.value = `${days} 天 ${hours} 时 ${minutes} 分 ${seconds} 秒`
+};
+
+const restartApp = async () => {
+  try {
+    await window.electron.restart()
+  } catch (error) {
+    window.electron.log.error('restart app failed')
+  }
+};
 
 </script>
 

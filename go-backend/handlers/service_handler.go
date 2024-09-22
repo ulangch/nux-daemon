@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"log"
 	"math"
-	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -37,21 +35,15 @@ func GetServiceInfo(c *gin.Context) {
 	}
 	var cpuUsage int
 	if cpuPercents, err := cpu.Percent(0, false); err == nil {
-		log.Printf("GetServiceInfo, cpuUsage=%f", cpuPercents[0])
-		cpuUsage = int(math.Floor(cpuPercents[0]))
+		cpuUsage = int(math.Min(math.Ceil(cpuPercents[0]), 100))
 	}
 	var memUsage int
 	if memInfo, err := mem.VirtualMemory(); err == nil {
-		log.Printf("GetServiceInfo, memUsage=%f", memInfo.UsedPercent)
 		memUsage = int(math.Floor(memInfo.UsedPercent))
 	}
 	var url string
-	if addrs, err := net.InterfaceAddrs(); err == nil {
-		for _, addr := range addrs {
-			if ipNet, ok := addr.(*net.IPNet); ok && !ipNet.IP.IsLoopback() && ipNet.IP.To4() != nil {
-				url = models.GenServiceUrl(ipNet.IP.String())
-			}
-		}
+	if ipv4 := models.GetLocalIPV4(); ipv4 != "" {
+		url = models.GenServiceUrl(ipv4)
 	}
 	var qrcode string
 	if url != "" {

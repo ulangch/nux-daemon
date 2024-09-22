@@ -1,5 +1,5 @@
 // electron/main.js
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, Tray } = require('electron');
 const { join } = require('path');
 const { spawn } = require('child_process')
 const path = require('path');
@@ -7,9 +7,15 @@ const path = require('path');
 // 屏蔽安全警告
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
+const log = require('electron-log');
+log.transports.file.resolvePathFn = () => path.join(app.getPath('logs'), 'main.log')
+
+let win
+let tray
+
 // 创建浏览器窗口时，调用这个函数。
 const createWindow = () => {
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 500,
     height: 800,
     title: '我的私有云',
@@ -31,18 +37,46 @@ const createWindow = () => {
   } else {
     win.loadFile(join(__dirname, '../dist/index.html'));
   }
+  win.on('close', (event) => {
+    if (!app.isQuiting) {
+      event.preventDefault()
+      win.hide()
+    }
+    return false
+  })
 };
 
-const log = require('electron-log');
-log.transports.file.resolvePathFn = () => path.join(app.getPath('logs'), 'main.log')
+const createTray = () => {
+  tray = new Tray(path.join(__dirname, '../dist/hasky.png'))
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: '显示',
+      click: () => {
+        win.show()
+      }
+    },
+    {
+      label: '退出',
+      click: () => {
+        app.isQuiting = true
+        app.quit()
+      }
+    }
+  ])
+  tray.setToolTip('我的应用') // TODO
+  tray.setContextMenu(contextMenu)
+  tray.on('click', () => {
+    win.show()
+  })
+};
 
 let daemon
 const startDaemon = () => {
   let daemonPath
   if (process.env.VITE_DEV_SERVER_URL) {
-    daemonPath = path.join(app.getAppPath(), 'public', 'nas-daemon.exe');
+    daemonPath = path.join(app.getAppPath(), 'extras', 'nas-daemon.exe');
   } else {
-    daemonPath = path.join(process.resourcesPath, 'public', 'nas-daemon.exe');
+    daemonPath = path.join(process.resourcesPath, 'extras', 'nas-daemon.exe');
   }
   daemon = spawn(daemonPath, [], { stdio: ['ignore', 'pipe', 'pipe'] });
   // daemon = spawn('powershell.exe', ['-Command', `Start-Process -FilePath ${daemonPath} -Verb RunAs`], {stdio: 'inherit'})
@@ -62,12 +96,15 @@ const startDaemon = () => {
 };
 
 // Electron 会在初始化后并准备
-app.whenReady().then(() => {
+app.on('ready', () => {
   startDaemon();
   createWindow();
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
+  createTray();
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  else win.show()
 });
 
 app.on('window-all-closed', () => {
@@ -85,4 +122,9 @@ ipcMain.handle('select-folder', async () => {
     properties: ['openDirectory']
   })
   return result.filePaths[0]
+});
+
+ipcMain.handle('restart', () => {
+  app.relaunch()
+  app.exit()
 });
