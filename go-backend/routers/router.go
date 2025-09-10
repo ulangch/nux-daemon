@@ -3,6 +3,8 @@ package routers
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	client_handlers "github.com/ulangch/nas_desktop_app/backend/client/handlers"
+	console_handlers "github.com/ulangch/nas_desktop_app/backend/console/handlers"
 	"github.com/ulangch/nas_desktop_app/backend/handlers"
 )
 
@@ -18,9 +20,9 @@ func SetupRouter() *gin.Engine {
 
 	// Define routes
 	r.GET("/device/info", handlers.GetDeviceInfoHandler)
-	// r.POST("/device/set_name", handlers.UpdateDeviceNameHandler)
-	// r.POST("/device/add_disk", handlers.AddDiskPath)
-	// r.POST("/device/remove_disk", handlers.RemoveDiskPath)
+	r.POST("/device/set_name", handlers.UpdateDeviceNameHandler)
+	r.POST("/device/add_disk", handlers.AddDiskPath)
+	r.POST("/device/remove_disk", handlers.RemoveDiskPath)
 
 	r.GET("/service/info", handlers.GetServiceInfo)
 	r.POST("/service/update_name", handlers.UpdateDeviceName)
@@ -64,5 +66,15 @@ func SetupRouter() *gin.Engine {
 
 	r.POST("/client/private_space/create", handlers.CreatePrivateSpaceHandler)
 	r.POST("/client/private_space/get", handlers.GetPrivateSpaceHandler)
+
+	// ----------------------------------- New Format Console-----------------------------------
+	r.GET("/console/service/info", console_handlers.GetServiceInfoHandler)
+	r.POST("/console/service/add_disk", console_handlers.AddDiskHandler)
+	r.POST("/console/service/remove_disk", console_handlers.RemoveDiskHandler)
+
+	// ----------------------------------- New Format Client-----------------------------------
+	r.GET("/client/service/info", client_handlers.GetServiceInfoHandler)
+	r.GET("/client/file/list", client_handlers.ListFilesHandler)
+
 	return r
 }

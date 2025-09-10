@@ -6,8 +6,10 @@ import (
 	"os"
 
 	"github.com/ulangch/nas_desktop_app/backend/config"
+	"github.com/ulangch/nas_desktop_app/backend/core"
 	"github.com/ulangch/nas_desktop_app/backend/models"
 	"github.com/ulangch/nas_desktop_app/backend/routers"
+	"github.com/ulangch/nas_desktop_app/backend/utils"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -37,13 +39,16 @@ func main() {
 	if err != nil {
 		panic("failed to connect database")
 	}
-	db.AutoMigrate(&models.KeyValue{}, &models.Collection{}, &models.RecentOpenFile{}, &models.RecentAddFile{}, &models.RecentDeleteFile{})
+	db.AutoMigrate(&utils.KeyValue{}, &models.KeyValue{}, &models.Collection{}, &models.RecentOpenFile{}, &models.RecentAddFile{}, &models.RecentDeleteFile{})
 	models.InitializeKVStore(db)
 	models.InitializeColStore(db)
 	models.InitializeRecentDB(db)
+	utils.InitializeKVStore(db)
 
 	// Setup device
 	models.InitializeDeviceID()
+
+	core.Initialize()
 
 	// Start the server
 	r := routers.SetupRouter()
